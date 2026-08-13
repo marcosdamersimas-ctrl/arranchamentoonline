@@ -1,13 +1,71 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>ARRANCHA+</title>
+    
+    <!-- PWA Web Manifest -->
+    <link rel="manifest" href="/manifest.webmanifest?v=6" />
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/arrancha-icon-32.png?v=6" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/arrancha-icon-16.png?v=6" />
+
+    <!-- Open Graph (iOS Share Sheet / Social Previews) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="ARRANCHA+" />
+    <meta property="og:description" content="Sistema de Arranchamento Inteligente & Controle de Efetivo - 7º RC Mec" />
+    <meta property="og:image" content="/arrancha-icon-512.png?v=6" />
+    <meta property="og:image:secure_url" content="/arrancha-icon-512.png?v=6" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="ARRANCHA+" />
+    <meta name="twitter:description" content="Sistema de Arranchamento Inteligente & Controle de Efetivo - 7º RC Mec" />
+    <meta name="twitter:image" content="/arrancha-icon-512.png?v=6" />
+
+    <!-- Android & PWA General Settings -->
+    <meta name="theme-color" content="#7A0C0C" />
+    <meta name="background-color" content="#fff9f3" />
+    <meta name="application-name" content="ARRANCHA+" />
+    <meta name="description" content="Sistema de Arranchamento Inteligente & Controle de Efetivo" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Apple iOS Settings (iPhone / iPad) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ARRANCHA+" />
+    <link rel="apple-touch-icon" href="/arrancha-icon-180.png?v=6" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/arrancha-icon-180.png?v=6" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/arrancha-icon-152.png?v=6" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/arrancha-icon-144.png?v=6" />
+    <link rel="apple-touch-icon" sizes="128x128" href="/arrancha-icon-128.png?v=6" />
+    <link rel="apple-touch-icon-precomposed" href="/arrancha-icon-180.png?v=6" />
+
+    <!-- Apple Startup / Splash Image -->
+    <link rel="apple-touch-startup-image" href="/arrancha-icon-512.png?v=6" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Automatic Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(function(registration) {
+              console.log('[PWA] ServiceWorker registration successful with scope: ', registration.scope);
+            })
+            .catch(function(err) {
+              console.warn('[PWA] ServiceWorker registration failed: ', err);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
-

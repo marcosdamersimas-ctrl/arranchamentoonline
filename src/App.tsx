@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { FirebaseUser, ArranchamentoRecord, UserNivel } from './types';
+import { FirebaseUser, ArranchamentoRecord } from './types';
 import { 
-  loadUsers, 
   saveUsersList, 
-  loadRecords, 
   saveRecordsList, 
   getTodayDateStr, 
-  getTomorrowDateStr, 
-  cleanTextId 
+  cleanTextId,
+  formatMilitaryName,
+  isSameUser,
+  deduplicateUsersList,
+  isMealForUser,
+  getMilitarGroupFromGraduacao,
+  isDateLocked
 } from './utils/storage';
 import Login from './components/Login';
 import Arranchamento from './components/Arranchamento';
 import Furriel from './components/Furriel';
 import Admin from './components/Admin';
 import AlterarSenha from './components/AlterarSenha';
+import NoticeBanner from './components/NoticeBanner';
 import { 
   Home, 
   Coffee, 
@@ -30,17 +34,14 @@ import {
   Bell, 
   Check, 
   Minus, 
-  Clock, 
   Award,
   ChevronRight,
   BookOpen,
   Copy,
   ExternalLink,
   Printer,
-  RefreshCw,
   AlertTriangle
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -79,18 +80,13 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // QR Code Site URL states
-  const [siteUrl] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.location.origin + window.location.pathname;
-    }
-    return 'https://ais-pre-45rpnwcobofcpdedbbd4ag-537545037284.us-west2.run.app/';
-  });
+  // QR Code Site URL states - Hardcoded to the production URL to ensure it is always reachable from home, mobile, etc.
+  const [siteUrl] = useState(() => window.location.origin);
   const [copied, setCopied] = useState(false);
 
   // Notification states
   const [notifications, setNotifications] = useState<string[]>([
-    'Aviso: Arranchamento para amanhã encerra hoje às 18:00h.',
+    'Aviso: Arranchamento para amanhã encerra hoje às 15:30h.',
     'Alerta: Cardápio do almoço de hoje atualizado.'
   ]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -98,45 +94,71 @@ export default function App() {
   // QR Code refreshing timer simulation
   const [qrSeconds, setQrSeconds] = useState(28);
 
-  const syncFromServer = async () => {
-    try {
-      const resUsers = await fetch('/api/users');
-      if (resUsers.ok) {
-        const data = await resUsers.json();
-        setUsers(data);
-        saveUsersList(data);
-        if (currentUser) {
-          const updatedMe = data.find((u: FirebaseUser) => u.id === currentUser.id);
-          if (updatedMe) {
-            setCurrentUser(updatedMe);
-          }
-        }
-      }
-      const resRecords = await fetch('/api/records');
-      if (resRecords.ok) {
-        const data = await resRecords.json();
-        setMeals(data);
-        saveRecordsList(data);
-      }
-    } catch (err) {
-      console.warn("Offline ou erro de rede ao conectar com o banco de dados central:", err);
+  const authHeaders = (user: FirebaseUser | null = currentUser): Record<string, string> => ({
+    'X-Arrancha-User': user?.id || user?.login || '',
+    'X-Arrancha-Password': user?.senha || ''
+  });
+
+  const syncFromServer = async (requester: FirebaseUser | null = currentUser) => {
+    if (!requester) {
+      setUsers([]);
+      setMeals([]);
+      return { users: [] as FirebaseUser[], meals: [] as ArranchamentoRecord[] };
     }
+    try {
+      const headers = authHeaders(requester);
+      const [resUsers, resRecords] = await Promise.all([
+        fetch('/api/users', { headers }),
+        fetch('/api/records', { headers })
+      ]);
+      if (resUsers.ok && resRecords.ok) {
+        const serverUsers: FirebaseUser[] = await resUsers.json();
+        const serverMeals: ArranchamentoRecord[] = await resRecords.json();
+        const finalUsers = deduplicateUsersList(serverUsers || []);
+        const mergedMeals = Array.from(new Map((serverMeals || []).map(meal => [meal.idRegistro, meal])).values());
+        setUsers(finalUsers);
+        saveUsersList(finalUsers);
+        setMeals(mergedMeals);
+        saveRecordsList(mergedMeals);
+
+        const updatedMe = finalUsers.find(user => user.id === requester.id || user.login === requester.login);
+        if (updatedMe && JSON.stringify(updatedMe) !== JSON.stringify(requester)) setCurrentUser(updatedMe);
+        if (!updatedMe) {
+          setCurrentUser(null);
+          alert('Sua conta foi excluída pelo administrador.');
+        }
+        return { users: finalUsers, meals: mergedMeals };
+      }
+      if (resUsers.status === 401 || resRecords.status === 401) setCurrentUser(null);
+    } catch (err) {
+      console.warn('Offline ou erro de rede ao conectar com o banco de dados central:', err);
+    }
+    return { users, meals };
   };
 
   useEffect(() => {
-    // Load initial storage immediately
-    setUsers(loadUsers());
-    setMeals(loadRecords());
-    
-    // Fetch live shared data from server
-    syncFromServer();
-
-    // Check for updates every 8 seconds
-    const interval = setInterval(() => {
-      syncFromServer();
-    }, 8000);
-    return () => clearInterval(interval);
+    if (!currentUser) {
+      setUsers([]);
+      setMeals([]);
+      return;
+    }
+    syncFromServer(currentUser);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') syncFromServer(currentUser);
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    fetch('/api/server-time').then(response => response.json()).then(({ now }) => {
+      (window as any).__ARRANCHA_SERVER_OFFSET_MS__ = new Date(now).getTime() - Date.now();
+    }).catch(() => undefined);
+  }, []);
 
   // Timer for QR code simulation
   useEffect(() => {
@@ -146,35 +168,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Update lists and save to storage
-  const handleUpdateUsers = async (updatedUsers: FirebaseUser[]) => {
-    setUsers(updatedUsers);
-    saveUsersList(updatedUsers);
-    try {
-      await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedUsers),
-      });
-    } catch (err) {
-      console.error("Erro de sincronização de usuários com o servidor:", err);
-    }
-  };
-
-  const handleUpdateMeals = async (updatedMeals: ArranchamentoRecord[]) => {
-    setMeals(updatedMeals);
-    saveRecordsList(updatedMeals);
-    try {
-      await fetch('/api/records', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedMeals),
-      });
-    } catch (err) {
-      console.error("Erro de sincronização de arranchamentos com o servidor:", err);
-    }
-  };
-
   // QR Code and printing actions
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(siteUrl);
@@ -183,6 +176,7 @@ export default function App() {
   };
 
   const handlePrintTableQRCode = () => {
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=2d0006&data=${encodeURIComponent(siteUrl)}`;
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -390,7 +384,7 @@ export default function App() {
       <div class="doc-subtitle">Rancho do 7º RC Mec</div>
       <div>
         <div class="qr-wrapper">
-          <img class="qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=2d0006&data=\${encodeURIComponent(siteUrl)}" alt="QR Code" />
+          <img class="qr-image" src="${qrImageUrl}" alt="QR Code" />
         </div>
       </div>
       <div class="steps-container">
@@ -400,7 +394,7 @@ export default function App() {
         </div>
         <div class="step-item">
           <span class="step-number">2</span>
-          <span>Faça o login ou crie o seu acesso</span>
+          <span>Entre com o acesso fornecido pelo Administrador</span>
         </div>
         <div class="step-item">
           <span class="step-number">3</span>
@@ -424,7 +418,7 @@ export default function App() {
       <div class="doc-subtitle">Rancho do 7º RC Mec</div>
       <div>
         <div class="qr-wrapper">
-          <img class="qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=2d0006&data=\${encodeURIComponent(siteUrl)}" alt="QR Code" />
+          <img class="qr-image" src="${qrImageUrl}" alt="QR Code" />
         </div>
       </div>
       <div class="steps-container">
@@ -434,7 +428,7 @@ export default function App() {
         </div>
         <div class="step-item">
           <span class="step-number">2</span>
-          <span>Faça o login ou crie o seu acesso</span>
+          <span>Entre com o acesso fornecido pelo Administrador</span>
         </div>
         <div class="step-item">
           <span class="step-number">3</span>
@@ -458,7 +452,7 @@ export default function App() {
       <div class="doc-subtitle">Rancho do 7º RC Mec</div>
       <div>
         <div class="qr-wrapper">
-          <img class="qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=2d0006&data=\${encodeURIComponent(siteUrl)}" alt="QR Code" />
+          <img class="qr-image" src="${qrImageUrl}" alt="QR Code" />
         </div>
       </div>
       <div class="steps-container">
@@ -468,7 +462,7 @@ export default function App() {
         </div>
         <div class="step-item">
           <span class="step-number">2</span>
-          <span>Faça o login ou crie o seu acesso</span>
+          <span>Entre com o acesso fornecido pelo Administrador</span>
         </div>
         <div class="step-item">
           <span class="step-number">3</span>
@@ -492,7 +486,7 @@ export default function App() {
       <div class="doc-subtitle">Rancho do 7º RC Mec</div>
       <div>
         <div class="qr-wrapper">
-          <img class="qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=2d0006&data=\${encodeURIComponent(siteUrl)}" alt="QR Code" />
+          <img class="qr-image" src="${qrImageUrl}" alt="QR Code" />
         </div>
       </div>
       <div class="steps-container">
@@ -502,7 +496,7 @@ export default function App() {
         </div>
         <div class="step-item">
           <span class="step-number">2</span>
-          <span>Faça o login ou crie o seu acesso</span>
+          <span>Entre com o acesso fornecido pelo Administrador</span>
         </div>
         <div class="step-item">
           <span class="step-number">3</span>
@@ -535,63 +529,125 @@ export default function App() {
   // Auth triggers
   const handleLoginSuccess = (user: FirebaseUser) => {
     setCurrentUser(user);
-    setActiveTab('inicio');
-  };
-
-  const handleRegisterUser = (newUser: FirebaseUser) => {
-    const updated = [...users, newUser];
-    handleUpdateUsers(updated);
+    setUsers([user]);
+    syncFromServer(user);
+    if (user.trocarSenhaNoPrimeiroAcesso || user.senha === '123456') {
+      setActiveTab('senha');
+    } else {
+      setActiveTab('inicio');
+    }
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setUsers([]);
+    setMeals([]);
+    setActiveTab('inicio');
   };
 
   // User details update
-  const handleUpdatePassword = (newPass: string) => {
+  const handleUpdatePassword = async (newPass: string) => {
     if (!currentUser) return;
-    const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, senha: newPass } : u);
-    handleUpdateUsers(updatedUsers);
-    setCurrentUser({ ...currentUser, senha: newPass });
+    const response = await fetch(`/api/users/${encodeURIComponent(currentUser.id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ senha: newPass, trocarSenhaNoPrimeiroAcesso: false })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(result.error || 'Não foi possível alterar a senha.');
+      return;
+    }
+    const updatedUser = result as FirebaseUser;
+    setCurrentUser(updatedUser);
+    setUsers(previous => previous.map(user => user.id === updatedUser.id ? updatedUser : user));
+    setActiveTab('inicio');
   };
 
-  const handleUpdateUser = (userId: string, updatedFields: Partial<FirebaseUser>) => {
-    const targetUser = users.find(u => u.id === userId);
+  const handleUpdateUser = async (userId: string, updatedFields: Partial<FirebaseUser>) => {
+    const targetUser = users.find(u => u.id === userId || (u.login && cleanTextId(u.login) === cleanTextId(userId)));
+    const finalFields = { ...updatedFields };
+
     if (targetUser) {
-      const checkRole = updatedFields.nivel !== undefined ? updatedFields.nivel : targetUser.nivel;
-      const checkRep = updatedFields.reparticao !== undefined ? updatedFields.reparticao : targetUser.reparticao;
-      if (checkRole === 'Furriel') {
-        if (checkRep === 'Oficiais' || checkRep === 'St/Sgt') {
-          alert('Os furriéis devem ser cadastrados por esquadrão. Oficiais e sargentos não precisam de furriel.');
-          return;
-        }
-      }
+      const newGrad = finalFields.graduacao || targetUser.graduacao;
+      const newRep = finalFields.reparticao || targetUser.reparticao;
+      const calculatedGrupo = getMilitarGroupFromGraduacao(newGrad, newRep, finalFields.grupo || targetUser.grupo);
+      finalFields.grupo = calculatedGrupo;
     }
-    const updatedUsers = users.map(u => u.id === userId ? { ...u, ...updatedFields } : u);
-    handleUpdateUsers(updatedUsers);
-    if (currentUser && currentUser.id === userId) {
-      setCurrentUser({ ...currentUser, ...updatedFields });
+    const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(finalFields)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(result.error || 'Não foi possível atualizar o usuário.');
+      return;
     }
+    const savedUser = result as FirebaseUser;
+    setUsers(previous => deduplicateUsersList(previous.map(user => isSameUser(user, savedUser) ? savedUser : user)));
+    if (currentUser && isSameUser(currentUser, savedUser)) setCurrentUser(savedUser);
   };
 
-  const handleDeleteUser = (userId: string) => {
-    const updatedUsers = users.filter(u => u.id !== userId);
-    const updatedMeals = meals.filter(m => cleanTextId(m.usuario) !== userId);
-    handleUpdateUsers(updatedUsers);
-    handleUpdateMeals(updatedMeals);
+  const handleDeleteUser = async (userId: string) => {
+    const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(result.error || 'Não foi possível excluir o usuário.');
+      return;
+    }
+    await syncFromServer();
   };
 
-  const handleAddUserByAdmin = (newUser: FirebaseUser) => {
-    const updatedUsers = [...users, newUser];
-    handleUpdateUsers(updatedUsers);
+  const handleAddUserByAdmin = async (newUser: FirebaseUser) => {
+    const userToAdd: FirebaseUser = {
+      ...newUser,
+      nuc: newUser.nuc || newUser.id || Math.floor(10000000 + Math.random() * 90000000).toString(),
+      senha: newUser.senha || '123456',
+      trocarSenhaNoPrimeiroAcesso: true
+    };
+    const response = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(userToAdd)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(result.error || 'Não foi possível cadastrar o usuário.');
+      return;
+    }
+    setUsers(previous => deduplicateUsersList([...previous, result as FirebaseUser]));
+  };
+
+  const saveIndividualMeal = async (record: ArranchamentoRecord) => {
+    if (!currentUser) return false;
+    const response = await fetch(`/api/records/${encodeURIComponent(currentUser.id)}/${record.dataRegistro}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ cafe: record.cafe, almoco: record.almoco, jantar: record.jantar })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(result.error || 'Não foi possível salvar o arranchamento.');
+      return false;
+    }
+    const savedRecord = result as ArranchamentoRecord;
+    setMeals(previous => [...previous.filter(item => item.idRegistro !== savedRecord.idRegistro), savedRecord]);
+    return true;
   };
 
   // Arranchar / Desarranchar
-  const handleUpdateMeal = (date: string, mealKey: 'cafe' | 'almoco' | 'jantar', value: boolean) => {
+  const handleUpdateMeal = async (date: string, mealKey: 'cafe' | 'almoco' | 'jantar', value: boolean) => {
     if (!currentUser) return;
+    if (isDateLocked(date)) {
+      alert(`Arranchamento bloqueado para a data ${date.split('-').reverse().join('/')}.`);
+      return;
+    }
 
-    const userKey = currentUser.usuario.toLowerCase();
-    const existingIndex = meals.findIndex(m => m.usuario.toLowerCase() === userKey && m.dataRegistro === date);
+    const existingIndex = meals.findIndex(m => isMealForUser(m, currentUser, date));
     let updatedMeals = [...meals];
 
     if (existingIndex > -1) {
@@ -600,8 +656,9 @@ export default function App() {
         [mealKey]: value
       };
     } else {
+      const userPrefix = cleanTextId(currentUser.id || currentUser.login || currentUser.usuario);
       const newRecord: ArranchamentoRecord = {
-        idRegistro: `${cleanTextId(currentUser.usuario)}_${date}`,
+        idRegistro: `${userPrefix}_${date}`,
         usuario: currentUser.usuario,
         reparticao: currentUser.reparticao,
         dataRegistro: date,
@@ -612,17 +669,17 @@ export default function App() {
       updatedMeals.push(newRecord);
     }
 
-    handleUpdateMeals(updatedMeals);
+    const record = updatedMeals.find(meal => isMealForUser(meal, currentUser, date));
+    if (record) await saveIndividualMeal(record);
   };
 
-  const handleBulkUpdateMeals = (updates: { date: string; cafe: boolean; almoco: boolean; jantar: boolean }[]) => {
+  const handleBulkUpdateMeals = async (updates: { date: string; cafe: boolean; almoco: boolean; jantar: boolean }[]) => {
     if (!currentUser) return;
 
     let updatedMeals = [...meals];
 
     updates.forEach(({ date, cafe, almoco, jantar }) => {
-      const userKey = currentUser.usuario.toLowerCase();
-      const existingIndex = updatedMeals.findIndex(m => m.usuario.toLowerCase() === userKey && m.dataRegistro === date);
+      const existingIndex = updatedMeals.findIndex(m => isMealForUser(m, currentUser, date));
 
       if (existingIndex > -1) {
         updatedMeals[existingIndex] = {
@@ -632,8 +689,9 @@ export default function App() {
           jantar
         };
       } else {
+        const userPrefix = cleanTextId(currentUser.id || currentUser.login || currentUser.usuario);
         const newRecord: ArranchamentoRecord = {
-          idRegistro: `${cleanTextId(currentUser.usuario)}_${date}`,
+          idRegistro: `${userPrefix}_${date}`,
           usuario: currentUser.usuario,
           reparticao: currentUser.reparticao,
           dataRegistro: date,
@@ -645,7 +703,18 @@ export default function App() {
       }
     });
 
-    handleUpdateMeals(updatedMeals);
+    setMeals(updatedMeals);
+    for (const { date } of updates) {
+      const record = updatedMeals.find(meal => isMealForUser(meal, currentUser, date));
+      if (record && !(await saveIndividualMeal(record))) break;
+    }
+  };
+
+  const handleCloseDaily = async (date: string) => {
+    const response = await fetch(`/api/closures/${date}`, { method: 'POST', headers: authHeaders() });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Não foi possível fechar o vale diário.');
+    return result;
   };
 
   // Access limits
@@ -656,23 +725,17 @@ export default function App() {
   // Allowed tabs based on access level
   const isTabAllowed = (tab: typeof activeTab) => {
     if (isMilitar) {
-      return ['inicio', 'arranchamento', 'historico', 'qrcode', 'senha'].includes(tab);
+      return ['inicio', 'arranchamento', 'senha'].includes(tab);
     }
     if (isFurriel) {
-      return ['inicio', 'arranchamento', 'historico', 'qrcode', 'furriel', 'senha'].includes(tab);
+      return ['inicio', 'arranchamento', 'furriel', 'senha'].includes(tab);
     }
-    return true; // Admin can see everything!
+    return ['inicio', 'arranchamento', 'furriel', 'usuarios', 'senha'].includes(tab);
   };
 
   // If not logged in, render the gorgeous login
   if (!currentUser) {
-    return (
-      <Login 
-        onLoginSuccess={handleLoginSuccess}
-        users={users}
-        onRegisterUser={handleRegisterUser}
-      />
-    );
+    return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
   const todayStr = getTodayDateStr();
@@ -697,7 +760,7 @@ export default function App() {
             <div className="bg-white p-6 rounded-3xl border border-gray-200/60 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h2 className="text-2xl font-display font-black text-vinho tracking-tight">
-                  Bem-vindo, {currentUser.usuario}!
+                  Bem-vindo, {formatMilitaryName(currentUser.usuario, currentUser.graduacao)}!
                 </h2>
                 <p className="text-xs text-gray-500 font-semibold mt-1">
                   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -805,50 +868,12 @@ export default function App() {
 
             </div>
 
-            {/* RESUMO DE HOJE (Stats area from image) */}
-            <div className="bg-white p-6 border border-gray-200 rounded-3xl shadow-sm">
-              <h4 className="text-xs font-display font-black text-vinho uppercase tracking-widest mb-4">
-                RESUMO DE HOJE
-              </h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                
-                {/* Café Count */}
-                <div className="bg-[#F9F9F9] border border-gray-200 p-4 rounded-2xl text-center">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">CAFÉ</span>
-                  <span className="text-2xl font-display font-black text-vinho mt-1 block font-mono">{totalCafeToday}</span>
-                  <span className="text-[9px] text-gray-500 block mt-1">militares</span>
-                </div>
-
-                {/* Almoço Count */}
-                <div className="bg-[#F9F9F9] border border-gray-200 p-4 rounded-2xl text-center">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">ALMOÇO</span>
-                  <span className="text-2xl font-display font-black text-vinho mt-1 block font-mono">{totalAlmocoToday}</span>
-                  <span className="text-[9px] text-gray-500 block mt-1">militares</span>
-                </div>
-
-                {/* Janta Count */}
-                <div className="bg-[#F9F9F9] border border-gray-200 p-4 rounded-2xl text-center">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">JANTA</span>
-                  <span className="text-2xl font-display font-black text-vinho mt-1 block font-mono">{totalJantarToday}</span>
-                  <span className="text-[9px] text-gray-500 block mt-1">militares</span>
-                </div>
-
-                {/* Total Count */}
-                <div className="bg-vinho/[0.03] border border-vinho/20 p-4 rounded-2xl text-center">
-                  <span className="text-[10px] font-bold text-vinho uppercase tracking-wider block">TOTAL</span>
-                  <span className="text-2xl font-display font-black text-vinho mt-1 block font-mono">{grandTotalToday}</span>
-                  <span className="text-[9px] text-gray-500 block mt-1">militares</span>
-                </div>
-
-              </div>
-            </div>
-
             {/* Quick Action Button to go to Arranchamento */}
             <button
               onClick={() => setActiveTab('arranchamento')}
               className="w-full py-4 bg-vinho hover:bg-vinho-escuro text-white rounded-2xl font-display font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-vinho/10 cursor-pointer"
             >
-              <span>CONFIRMAR ARRANCHAMENTO</span>
+              <span>REALIZAR ARRANCHAMENTO</span>
               <ChevronRight className="w-4 h-4 text-ouro" />
             </button>
           </div>
@@ -857,7 +882,6 @@ export default function App() {
         return (
           <Arranchamento 
             user={currentUser} 
-            users={users} 
             meals={meals} 
             onUpdateMeal={handleUpdateMeal} 
             onBulkUpdateMeals={handleBulkUpdateMeals} 
@@ -949,13 +973,18 @@ export default function App() {
             {/* QR Code Container and Actions */}
             <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center shadow-sm">
               
-              {/* Actual QRCodeSVG pointing to siteUrl */}
+              {/* Actual QR Code image pointing to siteUrl */}
               <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-md mb-6 relative">
-                <QRCodeSVG value={siteUrl} size={180} level="H" />
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&color=2d0006&data=${encodeURIComponent(siteUrl)}`}
+                  alt="QR Code"
+                  className="w-[180px] h-[180px] object-contain select-none"
+                  referrerPolicy="no-referrer"
+                />
                 
                 {/* Absolute centermost logo placeholder */}
-                <div className="absolute inset-0 m-auto w-10 h-10 bg-white rounded-xl border border-gray-200 flex items-center justify-center p-0.5">
-                  <span className="text-[#7A0C0C] font-display font-black text-xs leading-none">7º</span>
+                <div className="absolute inset-0 m-auto w-10 h-10 bg-[#8B0000] rounded-xl border-2 border-white flex items-center justify-center shadow-md overflow-hidden p-0.5">
+                  <img src="/arrancha-plus-logo.png?v=6" alt="ARRANCHA+" className="w-full h-full object-cover rounded-lg" />
                 </div>
               </div>
 
@@ -1053,7 +1082,15 @@ export default function App() {
           />
         );
       case 'furriel':
-        return <Furriel user={currentUser} users={users} meals={meals} />;
+        return (
+          <Furriel
+            user={currentUser}
+            users={users}
+            meals={meals}
+            onRefresh={() => syncFromServer(currentUser)}
+            onCloseDaily={handleCloseDaily}
+          />
+        );
       case 'senha':
         return <AlterarSenha user={currentUser} onUpdatePassword={handleUpdatePassword} />;
       default:
@@ -1085,8 +1122,8 @@ export default function App() {
         {/* Phone App Inner Header bar */}
         <div className="bg-vinho text-white px-5 py-4 border-b border-ouro/20 flex items-center justify-between shrink-0 shadow-md">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center border border-ouro shrink-0 p-0.5 shadow-sm">
-              <span className="text-vinho font-display font-bold text-[12px]">7º</span>
+            <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center border border-ouro shrink-0 p-0.5 shadow-sm overflow-hidden">
+              <img src="/arrancha-plus-logo.png?v=6" alt="ARRANCHA+" className="w-full h-full object-contain rounded-md" />
             </div>
             <span className="text-base font-display font-black tracking-tight uppercase">
               ARRANCHA<span className="text-ouro">+</span>
@@ -1094,7 +1131,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-[10px] font-bold leading-none">{currentUser.usuario}</p>
+              <p className="text-[10px] font-bold leading-none">{formatMilitaryName(currentUser.usuario, currentUser.graduacao)}</p>
               <p className="text-[8px] text-ouro font-medium leading-none mt-1 uppercase tracking-wider">{currentUser.nivel}</p>
             </div>
             <button
@@ -1109,6 +1146,7 @@ export default function App() {
 
         {/* App Content scrolling zone */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 bg-[#F3F3F3] relative" id="mobile-scroll-container">
+          <NoticeBanner />
           <AnimatePresence mode="wait" custom={slideDirection}>
             <motion.div
               key={activeTab}
@@ -1148,30 +1186,6 @@ export default function App() {
             >
               <Coffee className="w-4.5 h-4.5" />
               <span className="text-[8px] font-semibold tracking-tight">Rancho</span>
-            </button>
-          )}
-
-          {isTabAllowed('historico') && (
-            <button
-              onClick={() => changeTab('historico')}
-              className={`flex flex-col items-center gap-1 transition-all cursor-pointer flex-1 min-w-[45px] ${
-                activeTab === 'historico' ? 'text-vinho scale-105 font-bold' : 'text-gray-400'
-              }`}
-            >
-              <History className="w-4.5 h-4.5" />
-              <span className="text-[8px] font-semibold tracking-tight">Histórico</span>
-            </button>
-          )}
-
-          {isTabAllowed('qrcode') && (
-            <button
-              onClick={() => changeTab('qrcode')}
-              className={`flex flex-col items-center gap-1 transition-all cursor-pointer flex-1 min-w-[45px] ${
-                activeTab === 'qrcode' ? 'text-vinho scale-105 font-bold' : 'text-gray-400'
-              }`}
-            >
-              <QrCode className="w-4.5 h-4.5" />
-              <span className="text-[8px] font-semibold tracking-tight">QR Code</span>
             </button>
           )}
 
@@ -1220,8 +1234,8 @@ export default function App() {
           {/* Header ONLY for simulation toggle */}
           <header className="bg-vinho text-white border-b border-ouro/25 px-6 py-4 flex justify-between items-center z-20 shrink-0 shadow-md">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white border-2 border-ouro flex items-center justify-center p-1 shrink-0">
-                <span className="text-vinho font-display font-black text-base tracking-tighter">7º</span>
+              <div className="w-10 h-10 rounded-xl bg-white border-2 border-ouro flex items-center justify-center p-0.5 shrink-0 overflow-hidden">
+                <img src="/arrancha-plus-logo.png?v=6" alt="ARRANCHA+" className="w-full h-full object-contain rounded-lg" />
               </div>
               <div>
                 <span className="text-lg font-display font-black tracking-tight block">
@@ -1296,8 +1310,8 @@ export default function App() {
       <header className="bg-vinho text-white border-b border-ouro/25 px-6 py-4 flex justify-between items-center z-20 print:hidden shrink-0 shadow-md">
         <div className="flex items-center gap-3">
           {/* Logo */}
-          <div className="w-10 h-10 rounded-xl bg-white border-2 border-ouro flex items-center justify-center p-1 shrink-0">
-            <span className="text-vinho font-display font-black text-base tracking-tighter">7º</span>
+          <div className="w-10 h-10 rounded-xl bg-white border-2 border-ouro flex items-center justify-center p-0.5 shrink-0 overflow-hidden shadow-sm">
+            <img src="/arrancha-plus-logo.png?v=6" alt="ARRANCHA+" className="w-full h-full object-cover rounded-lg" />
           </div>
           <div>
             <span className="text-lg font-display font-black tracking-tight block">
@@ -1373,10 +1387,10 @@ export default function App() {
           {/* Profile Name info matching the web image */}
           <div className="hidden sm:flex items-center gap-2.5 border-l border-white/15 pl-4">
             <div className="w-8 h-8 rounded-full bg-white/10 border border-ouro/30 flex items-center justify-center font-display font-black text-xs text-ouro">
-              {currentUser.usuario.substring(0, 2).toUpperCase()}
+              {formatMilitaryName(currentUser.usuario, currentUser.graduacao).substring(0, 2).toUpperCase()}
             </div>
             <div className="text-left">
-              <p className="text-xs font-bold leading-none">{currentUser.usuario}</p>
+              <p className="text-xs font-bold leading-none">{formatMilitaryName(currentUser.usuario, currentUser.graduacao)}</p>
               <p className="text-[9px] text-ouro font-medium leading-none mt-0.5">{currentUser.nivel}</p>
             </div>
           </div>
@@ -1427,8 +1441,8 @@ export default function App() {
             {/* Phone App Inner Header bar from image */}
             <div className="bg-vinho text-white px-5 py-3.5 border-b border-ouro/20 flex items-center justify-between shrink-0">
               <span className="text-sm font-display font-black tracking-tight">ARRANCHA+</span>
-              <div className="w-6 h-6 rounded-lg bg-white flex items-center justify-center border border-ouro shrink-0 p-0.5">
-                <span className="text-vinho font-display font-bold text-[10px]">7º</span>
+              <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center border border-ouro shrink-0 p-0.5 overflow-hidden">
+                <img src="/arrancha-plus-logo.png?v=6" alt="ARRANCHA+" className="w-full h-full object-cover rounded-md" />
               </div>
             </div>
 
@@ -1544,36 +1558,6 @@ export default function App() {
                   </button>
                 )}
 
-                {/* Histórico */}
-                {isTabAllowed('historico') && (
-                  <button
-                    onClick={() => setActiveTab('historico')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                      activeTab === 'historico' 
-                        ? 'bg-vinho text-ouro shadow-inner border-l-4 border-ouro' 
-                        : 'text-white/80 hover:bg-white/5 hover:text-white'
-                    }`}
-                  >
-                    <History className="w-4.5 h-4.5" />
-                    <span>Histórico</span>
-                  </button>
-                )}
-
-                {/* QR Code */}
-                {isTabAllowed('qrcode') && (
-                  <button
-                    onClick={() => setActiveTab('qrcode')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                      activeTab === 'qrcode' 
-                        ? 'bg-vinho text-ouro shadow-inner border-l-4 border-ouro' 
-                        : 'text-white/80 hover:bg-white/5 hover:text-white'
-                    }`}
-                  >
-                    <QrCode className="w-4.5 h-4.5" />
-                    <span>QR Code</span>
-                  </button>
-                )}
-
                 {/* Furriel panel (Sees only if Furriel or Admin) */}
                 {isTabAllowed('furriel') && (
                   <button
@@ -1624,8 +1608,9 @@ export default function App() {
               </div>
 
               {/* Bottom sidebar brand footer */}
-              <div className="p-4 border-t border-white/5 bg-black/10 text-[11px] text-white/60 text-center font-display font-black tracking-wider">
-                <p>ARRANCHA+</p>
+              <div className="p-4 border-t border-white/5 bg-black/10 text-[11px] text-white/60 text-center font-display font-bold tracking-wider space-y-0.5">
+                <p className="font-black">ARRANCHA+</p>
+                <p className="text-[9px] text-white/40 uppercase font-semibold">Versão 1.0</p>
               </div>
 
             </aside>
@@ -1649,6 +1634,7 @@ export default function App() {
         )}
 
       </div>
+
     </div>
   );
 }

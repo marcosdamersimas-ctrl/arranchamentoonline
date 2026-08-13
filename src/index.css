@@ -13,6 +13,19 @@
   --color-cinza: #F3F3F3;
 }
 
+.bg-radial-vignette {
+  background-image: radial-gradient(circle at center, transparent 15%, rgba(29, 0, 4, 0.9) 95%);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 0.8; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 1.2s ease-out forwards;
+}
+
 /* Custom Scrollbar Styles */
 ::-webkit-scrollbar {
   width: 6px;

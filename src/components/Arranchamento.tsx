@@ -1,29 +1,58 @@
 import React, { useState } from 'react';
 import { FirebaseUser, ArranchamentoRecord } from '../types';
-import { getNextSevenDays, isDateLocked } from '../utils/storage';
-import { generateArranchamentoPDF } from '../utils/pdfGenerator';
-import { Calendar, AlertCircle, Printer, Coffee, Utensils, Moon, CheckCircle2, XCircle, Lock } from 'lucide-react';
+import { getNextSevenDays, isDateLocked, isMealForUser } from '../utils/storage';
+import { Calendar, AlertCircle, Coffee, Utensils, Moon, CheckCircle2, XCircle, Lock, ChevronLeft, ChevronRight, CopyCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface ArranchamentoProps {
   user: FirebaseUser;
-  users: FirebaseUser[];
   meals: ArranchamentoRecord[];
   onUpdateMeal: (date: string, mealKey: 'cafe' | 'almoco' | 'jantar', value: boolean) => void;
   onBulkUpdateMeals?: (updates: { date: string; cafe: boolean; almoco: boolean; jantar: boolean }[]) => void;
 }
 
-export default function Arranchamento({ user, users, meals, onUpdateMeal, onBulkUpdateMeals }: ArranchamentoProps) {
+export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateMeals }: ArranchamentoProps) {
   const daysOfWeek = getNextSevenDays();
   const [selectedDate, setSelectedDate] = useState<string>(daysOfWeek[0].dateStr);
-  const [selectedPrintReparticao, setSelectedPrintReparticao] = useState<string>('Todas');
   const [activeMobileMeal, setActiveMobileMeal] = useState<'cafe' | 'almoco' | 'jantar'>('almoco');
+
+  const currentIndex = daysOfWeek.findIndex(d => d.dateStr === selectedDate);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < daysOfWeek.length - 1;
+
+  const handlePrevDay = () => {
+    if (hasPrev) {
+      setSelectedDate(daysOfWeek[currentIndex - 1].dateStr);
+    }
+  };
+
+  const handleNextDay = () => {
+    if (hasNext) {
+      setSelectedDate(daysOfWeek[currentIndex + 1].dateStr);
+    }
+  };
+
+  const getFullMobileDateLabel = (dayObj: { label: string; dateStr: string; weekday: string }) => {
+    const weekdaysFull = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    const [year, month, day] = dayObj.dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    const formattedDate = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}`;
+    const weekdayFull = weekdaysFull[date.getDay()];
+    
+    if (dayObj.label === 'Hoje') {
+      return `Hoje (${formattedDate}) - ${weekdayFull}`;
+    } else if (dayObj.label === 'Amanhã') {
+      return `Amanhã (${formattedDate}) - ${weekdayFull}`;
+    } else {
+      return `${weekdayFull}, ${formattedDate}`;
+    }
+  };
 
   const activeDayObj = daysOfWeek.find(d => d.dateStr === selectedDate);
   const selectedDateLabel = activeDayObj ? activeDayObj.label : 'Selecionado';
 
   // Find record for user/date
-  const currentRecord = meals.find(m => m.usuario.toLowerCase() === user.usuario.toLowerCase() && m.dataRegistro === selectedDate) || {
+  const currentRecord = meals.find(m => isMealForUser(m, user, selectedDate)) || {
     idRegistro: 'temp',
     usuario: user.usuario,
     reparticao: user.reparticao,
@@ -33,7 +62,7 @@ export default function Arranchamento({ user, users, meals, onUpdateMeal, onBulk
     jantar: false
   };
 
-  // Verificação real e funcional do travamento: Limite até o dia anterior às 15:30
+  // A trava do arranchamento aplica-se a todos os usuários (inclusive Administradores e Furriéis)
   const locked = isDateLocked(selectedDate);
 
   const handleMealToggle = (mealKey: 'cafe' | 'almoco' | 'jantar', currentValue: boolean) => {
@@ -41,8 +70,20 @@ export default function Arranchamento({ user, users, meals, onUpdateMeal, onBulk
     onUpdateMeal(selectedDate, mealKey, !currentValue);
   };
 
-  const handlePrintDailyReport = () => {
-    generateArranchamentoPDF(users, meals, selectedDate, selectedPrintReparticao);
+  const handleRepeatForOpenDays = () => {
+    if (!onBulkUpdateMeals) return;
+    const openDays = daysOfWeek.filter(day => !isDateLocked(day.dateStr));
+    if (openDays.length === 0) {
+      alert('Não há datas abertas neste período.');
+      return;
+    }
+    if (!window.confirm(`Repetir esta combinação de refeições nos ${openDays.length} dias ainda abertos?`)) return;
+    onBulkUpdateMeals(openDays.map(day => ({
+      date: day.dateStr,
+      cafe: currentRecord.cafe,
+      almoco: currentRecord.almoco,
+      jantar: currentRecord.jantar
+    })));
   };
 
   const getMealTimeRange = (meal: 'cafe' | 'almoco' | 'jantar') => {
@@ -60,8 +101,8 @@ export default function Arranchamento({ user, users, meals, onUpdateMeal, onBulk
   return (
     <div className="space-y-6 font-sans text-grafite">
       
-      {/* Top Banner & Week Calendar */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5 bg-white p-6 border border-gray-200/60 rounded-3xl shadow-sm">
+      {/* Top Banner & Week Calendar (Desktop Only) */}
+      <div className="hidden md:flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5 bg-white p-6 border border-gray-200/60 rounded-3xl shadow-sm">
         <div>
           <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-ouro animate-ping shrink-0" />
@@ -102,6 +143,40 @@ export default function Arranchamento({ user, users, meals, onUpdateMeal, onBulk
         </div>
       </div>
 
+      {/* Mobile-Only Day Navigation Header (Exactly 1 day of Arranchamento!) */}
+      <div className="block md:hidden bg-white p-4 border border-gray-200/60 rounded-3xl shadow-sm text-center">
+        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Data do Arranchamento</span>
+        <div className="flex items-center justify-between gap-1.5 bg-gray-50 p-1 rounded-2xl border border-gray-200/50">
+          <button
+            type="button"
+            disabled={!hasPrev}
+            onClick={handlePrevDay}
+            className={`p-2.5 rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer ${
+              hasPrev ? 'text-vinho hover:bg-gray-200/60 active:scale-95 animate-pulse' : 'text-gray-300 cursor-not-allowed'
+            }`}
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-display font-black text-vinho uppercase tracking-tight truncate">
+              {activeDayObj ? getFullMobileDateLabel(activeDayObj) : ''}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            disabled={!hasNext}
+            onClick={handleNextDay}
+            className={`p-2.5 rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer ${
+              hasNext ? 'text-vinho hover:bg-gray-200/60 active:scale-95 animate-pulse' : 'text-gray-300 cursor-not-allowed'
+            }`}
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
       {/* Updated Aviso! (Normas de rancho replaced exactly as requested) */}
       <div className="p-4 bg-vinho/[0.03] border-l-4 border-ouro rounded-r-2xl flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-vinho shrink-0 mt-0.5" />
@@ -115,8 +190,19 @@ export default function Arranchamento({ user, users, meals, onUpdateMeal, onBulk
       {locked && (
         <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2.5 text-xs text-red-800 font-bold uppercase">
           <Lock className="w-4 h-4 text-red-600 shrink-0" />
-          <span>Alterações encerradas para esta data. Bloqueado em {formatDateLabel(selectedDate)} (Limite era dia anterior às 15:30).</span>
+          <span>Arranchamento encerrado para {formatDateLabel(selectedDate)}. Sáb/Dom/Seg: sexta às 10:30. Ter a Sex: dia anterior às 15:30.</span>
         </div>
+      )}
+
+      {!locked && onBulkUpdateMeals && (
+        <button
+          type="button"
+          onClick={handleRepeatForOpenDays}
+          className="w-full bg-white border border-vinho/15 hover:border-vinho/35 text-vinho rounded-2xl px-5 py-3.5 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all"
+        >
+          <CopyCheck className="w-4 h-4 text-ouro" />
+          Repetir estas refeições nos dias abertos
+        </button>
       )}
 
       {/* Meal Cards Container - Descriptions (Menus) removed as requested */}

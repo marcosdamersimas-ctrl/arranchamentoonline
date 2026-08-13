@@ -1,18 +1,58 @@
 import { jsPDF } from 'jspdf';
 import { FirebaseUser, ArranchamentoRecord } from '../types';
+import { formatMilitaryName, isMealForUser, getMilitarGroupFromGraduacao, cleanTextId } from './storage';
+
+export function normalizeReparticao(rep: string): string {
+  const norm = (rep || '').toLowerCase().replace(/°/g, 'º').trim();
+  if (norm.includes('3º esqd') || norm.includes('3 esqd') || norm.includes('3ºesqd')) {
+    return '3º esqd c mec';
+  }
+  if (norm.includes('1º esqd') || norm.includes('1 esqd') || norm.includes('1ºesqd')) {
+    return '1º esqd c mec';
+  }
+  if (norm.includes('2º esqd') || norm.includes('2 esqd') || norm.includes('2ºesqd')) {
+    return '2º esqd c mec';
+  }
+  if (norm.includes('cap')) {
+    return 'esqd cap';
+  }
+  if (norm.includes('fanf')) {
+    return 'fanfarra';
+  }
+  if (norm.includes('visit')) {
+    return 'visitantes';
+  }
+  return norm;
+}
 
 export function generateMapaDaForcaPDF(
   users: FirebaseUser[],
   meals: ArranchamentoRecord[],
-  dateStr: string
+  dateStr: string,
+  selectedEsq: string = 'Todos',
+  selectedGrp: string = 'Todos'
 ) {
+  const getMilitarGroup = (graduacao: string, reparticao: string, grupo?: string): 'Oficiais' | 'St/Sgt' | 'Cb/Sd' => {
+    return getMilitarGroupFromGraduacao(graduacao, reparticao, grupo);
+  };
+
+  const filteredUsers = users.filter(u => {
+    if (selectedEsq !== 'Todos') {
+      if (normalizeReparticao(u.reparticao) !== normalizeReparticao(selectedEsq)) return false;
+    }
+    if (selectedGrp !== 'Todos') {
+      if (getMilitarGroup(u.graduacao, u.reparticao) !== selectedGrp) return false;
+    }
+    return true;
+  });
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
   });
 
-  const totalUsers = users.length;
+  const totalUsers = filteredUsers.length;
 
   // Outer border - Vinho Color Theme
   doc.setDrawColor(122, 12, 12); // Vinho
@@ -43,8 +83,11 @@ export function generateMapaDaForcaPDF(
   // Title
   doc.setTextColor(122, 12, 12); // Vinho
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('MAPA DA FORÇA', 105, 42, { align: 'center' });
+  doc.setFontSize(13);
+  let titleStr = 'MAPA DA FORÇA';
+  if (selectedEsq !== 'Todos') titleStr += ` - ${selectedEsq.toUpperCase()}`;
+  if (selectedGrp !== 'Todos') titleStr += ` (${selectedGrp.toUpperCase()})`;
+  doc.text(titleStr, 105, 42, { align: 'center' });
 
   // Date and Metadata
   doc.setTextColor(30, 30, 30);
@@ -84,7 +127,7 @@ export function generateMapaDaForcaPDF(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.text('Nome de Guerra', 18, tableTop + 5);
-  doc.text('Esquadrão / Repartição', 95, tableTop + 5);
+  doc.text('Esquadrão / Grupo', 95, tableTop + 5);
   doc.text('Nível de Acesso', 160, tableTop + 5);
 
   doc.setTextColor(30, 30, 30);
@@ -94,7 +137,7 @@ export function generateMapaDaForcaPDF(
   let y = tableTop + 7;
   const rowHeight = 6.2;
 
-  users.forEach((u, index) => {
+  filteredUsers.forEach((u, index) => {
     // Check page overflow
     if (y > 255) {
       doc.setFontSize(7.5);
@@ -119,7 +162,7 @@ export function generateMapaDaForcaPDF(
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
       doc.text('Nome de Guerra', 18, y + 5);
-      doc.text('Esquadrão / Repartição', 95, y + 5);
+      doc.text('Esquadrão / Grupo', 95, y + 5);
       doc.text('Nível de Acesso', 160, y + 5);
 
       doc.setTextColor(30, 30, 30);
@@ -140,7 +183,7 @@ export function generateMapaDaForcaPDF(
 
     // User Text
     doc.setFont('helvetica', 'bold');
-    doc.text(u.usuario, 18, y + 4.2);
+    doc.text(formatMilitaryName(u.usuario, u.graduacao), 18, y + 4.2);
     doc.setFont('helvetica', 'normal');
     doc.text(u.reparticao, 95, y + 4.2);
     doc.text(u.nivel, 160, y + 4.2);
@@ -171,19 +214,6 @@ export function generateArranchamentoPDF(
 
   const formattedDate = dateStr.split('-').reverse().join('/');
 
-  // Filter meals for the selected date and, if specified, for the selected department
-  const filteredMeals = meals.filter(m => {
-    if (m.dataRegistro !== dateStr) return false;
-    if (!m.cafe && !m.almoco && !m.jantar) return false;
-
-    if (selectedReparticao !== 'Todas') {
-      const userObj = users.find(u => u.usuario.toLowerCase() === m.usuario.toLowerCase());
-      const rep = userObj?.reparticao || m.reparticao || 'Esqd Cap';
-      return rep.toLowerCase().trim() === selectedReparticao.toLowerCase().trim();
-    }
-    return true;
-  });
-
   // Grouping structure
   interface GroupedMilitary {
     usuario: string;
@@ -193,39 +223,59 @@ export function generateArranchamentoPDF(
     reparticaoOriginal: string;
   }
 
-  const groupBuckets: { [key: string]: GroupedMilitary[] } = {
-    'Oficiais': [],
-    'St/Sgt': [],
-    '1º Esqd': [],
-    '2º Esqd': [],
-    '3º Esqd': [],
-    'Esqd Cap': [],
-    'Fanfarra': []
+  interface ReportSection {
+    title: string;
+    members: GroupedMilitary[];
+  }
+
+  const getMilitarGroup = (graduacao: string, userGrupo?: string, reparticao?: string): 'Oficiais' | 'St/Sgt' | 'Cb/Sd' => {
+    return getMilitarGroupFromGraduacao(graduacao, reparticao, userGrupo);
   };
 
-  filteredMeals.forEach(m => {
-    const userObj = users.find(u => u.usuario.toLowerCase() === m.usuario.toLowerCase());
-    const rep = userObj?.reparticao || m.reparticao || 'Esqd Cap';
-    
-    // Find the closest bucket or default to 'Esqd Cap'
-    let targetBucket = 'Esqd Cap';
-    if (groupBuckets[rep]) {
-      targetBucket = rep;
-    } else {
-      // Find case-insensitive match or match partial words
-      const foundBucketKey = Object.keys(groupBuckets).find(k => k.toLowerCase() === rep.toLowerCase());
-      if (foundBucketKey) {
-        targetBucket = foundBucketKey;
-      }
-    }
+  const reportSections: ReportSection[] = [];
+  const SQUADRONS = ['1º Esqd C Mec', '2º Esqd C Mec', '3º Esqd C Mec', 'Esqd Cap', 'Fanfarra', 'Visitantes'];
 
-    groupBuckets[targetBucket].push({
-      usuario: m.usuario,
-      reparticaoOriginal: rep,
-      cafe: m.cafe,
-      almoco: m.almoco,
-      jantar: m.jantar
+  const activeSquadrons = selectedReparticao === 'Todas' ? SQUADRONS : [selectedReparticao];
+
+  activeSquadrons.forEach(sq => {
+    // Get ALL registered users for this squadron, sorted alphabetically
+    const sqUsers = users
+      .filter(u => normalizeReparticao(u.reparticao) === normalizeReparticao(sq))
+      .sort((a, b) => a.usuario.localeCompare(b.usuario));
+    
+    if (sqUsers.length === 0) return;
+
+    const oficiais: GroupedMilitary[] = [];
+    const stSgt: GroupedMilitary[] = [];
+    const cbSd: GroupedMilitary[] = [];
+
+    sqUsers.forEach(userObj => {
+      // Find their meal record for this date
+      const mealObj = meals.find(m => isMealForUser(m, userObj, dateStr));
+
+      const group = getMilitarGroup(userObj.graduacao, userObj.grupo, userObj.reparticao);
+      const member: GroupedMilitary = {
+        usuario: userObj.usuario,
+        reparticaoOriginal: userObj.reparticao,
+        cafe: mealObj ? mealObj.cafe : false,
+        almoco: mealObj ? mealObj.almoco : false,
+        jantar: mealObj ? mealObj.jantar : false
+      };
+
+      if (group === 'Oficiais') oficiais.push(member);
+      else if (group === 'St/Sgt') stSgt.push(member);
+      else cbSd.push(member);
     });
+
+    if (oficiais.length > 0) {
+      reportSections.push({ title: `${sq.toUpperCase()} - OFICIAIS`, members: oficiais });
+    }
+    if (stSgt.length > 0) {
+      reportSections.push({ title: `${sq.toUpperCase()} - SUBTENENTES E SARGENTOS`, members: stSgt });
+    }
+    if (cbSd.length > 0) {
+      reportSections.push({ title: `${sq.toUpperCase()} - CABOS E SOLDADOS`, members: cbSd });
+    }
   });
 
   let pageNum = 1;
@@ -280,12 +330,8 @@ export function generateArranchamentoPDF(
     jantar: 165
   };
 
-  const orderedGroups = selectedReparticao === 'Todas'
-    ? ['Oficiais', 'St/Sgt', '1º Esqd', '2º Esqd', '3º Esqd', 'Esqd Cap', 'Fanfarra']
-    : [selectedReparticao];
-
-  orderedGroups.forEach(groupName => {
-    const list = groupBuckets[groupName] || [];
+  reportSections.forEach(section => {
+    const list = section.members;
     if (list.length === 0) return;
 
     // Check if we need a page break before drawing the group header
@@ -303,14 +349,7 @@ export function generateArranchamentoPDF(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     
-    let headerText = groupName.toUpperCase();
-    if (groupName === 'Oficiais') headerText += ' (TODOS OS OFICIAIS DO REGIMENTO)';
-    if (groupName === 'St/Sgt') headerText += ' (TODOS OS SUBTENENTES E SARGENTOS)';
-    if (['1º Esqd', '2º Esqd', '3º Esqd', 'Esqd Cap', 'Fanfarra'].includes(groupName)) {
-      headerText += ' (CABOS E SOLDADOS)';
-    }
-
-    doc.text(headerText, 18, y + 4.5);
+    doc.text(section.title, 18, y + 4.5);
     y += 6.5;
 
     // Draw Table Header Row
@@ -346,7 +385,7 @@ export function generateArranchamentoPDF(
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        doc.text(`${groupName.toUpperCase()} (CONT.)`, 18, y + 4.2);
+        doc.text(`${section.title} (CONT.)`, 18, y + 4.2);
         y += 6;
 
         doc.setFillColor(245, 245, 245);
@@ -381,7 +420,18 @@ export function generateArranchamentoPDF(
 
       // Print war name
       doc.setFont('helvetica', 'bold');
-      doc.text(member.usuario, colX.name + 3, y + 4.2);
+      const userObjForMember = users.find(u => {
+        const nameMatch = u.usuario.toLowerCase().trim() === member.usuario.toLowerCase().trim();
+        if (!nameMatch) return false;
+        if (normalizeReparticao(u.reparticao) === normalizeReparticao(member.reparticaoOriginal)) return true;
+        const otherUserWithSameName = users.some(other => 
+          other.id !== u.id && 
+          other.usuario.toLowerCase().trim() === u.usuario.toLowerCase().trim() &&
+          normalizeReparticao(other.reparticao) === normalizeReparticao(member.reparticaoOriginal)
+        );
+        return !otherUserWithSameName;
+      });
+      doc.text(formatMilitaryName(member.usuario, userObjForMember?.graduacao), colX.name + 3, y + 4.2);
       doc.setFont('helvetica', 'normal');
 
       // Café Check
@@ -421,33 +471,117 @@ export function generateArranchamentoPDF(
   });
 
   // Final total counts and signature lines
-  if (y > 205) {
+  // Pre-calculate totals of active arranchados (cafe, almoco, jantar) for each squadron
+  const SQUADRONS_TOTAL = selectedReparticao === 'Todas'
+    ? ['1º Esqd C Mec', '2º Esqd C Mec', '3º Esqd C Mec', 'Esqd Cap', 'Fanfarra', 'Visitantes']
+    : [selectedReparticao];
+
+  const squadronTotals = SQUADRONS_TOTAL.map(sq => {
+    const sqUsers = users.filter(u => normalizeReparticao(u.reparticao) === normalizeReparticao(sq));
+    let cafeCount = 0;
+    let almocoCount = 0;
+    let jantarCount = 0;
+
+    sqUsers.forEach(u => {
+      const m = meals.find(rec => isMealForUser(rec, u, dateStr));
+      if (m) {
+        if (m.cafe) cafeCount++;
+        if (m.almoco) almocoCount++;
+        if (m.jantar) jantarCount++;
+      }
+    });
+
+    return {
+      squadron: sq,
+      cafe: cafeCount,
+      almoco: almocoCount,
+      jantar: jantarCount,
+      total: cafeCount + almocoCount + jantarCount
+    };
+  });
+
+  const totalsTableHeight = selectedReparticao === 'Todas' ? 45 : 25;
+  if (y > (280 - totalsTableHeight - 25)) {
     doc.addPage();
     pageNum++;
     drawPageSkeleton();
     y = 45;
   }
 
-  // Footer / Total statistics block
-  doc.setFillColor(250, 240, 240);
-  doc.rect(15, y, 180, 15, 'F');
-  doc.setDrawColor(122, 12, 12);
-  doc.setLineWidth(0.3);
-  doc.rect(15, y, 180, 15);
-
-  const totalCafe = filteredMeals.filter(m => m.cafe).length;
-  const totalAlmoco = filteredMeals.filter(m => m.almoco).length;
-  const totalJantar = filteredMeals.filter(m => m.jantar).length;
-  
-  doc.setTextColor(122, 12, 12);
+  // Draw Totals Table Header
+  doc.setFillColor(122, 12, 12);
+  doc.rect(15, y, 180, 6, 'F');
+  doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.text('QUANTITATIVO TOTAL DE ETAPAS DESTE ARRANCHAMENTO:', 18, y + 5);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(30, 30, 30);
-  doc.text(`CAFÉ DA MANHÃ: ${totalCafe}   |   ALMOÇO: ${totalAlmoco}   |   JANTAR: ${totalJantar}`, 18, y + 10);
+  const totalsHeaderTitle = selectedReparticao === 'Todas'
+    ? 'RESUMO DE MILITARES ARRANCHADOS POR ESQUADRÃO (ETAPAS)'
+    : `RESUMO DE MILITARES ARRANCHADOS - ${selectedReparticao.toUpperCase()} (ETAPAS)`;
+  doc.text(totalsHeaderTitle, 105, y + 4.2, { align: 'center' });
+  y += 6;
 
-  y += 32;
+  // Header columns
+  doc.setFillColor(245, 245, 245);
+  doc.rect(15, y, 180, 5, 'F');
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.15);
+  doc.rect(15, y, 180, 5);
+  doc.setTextColor(30, 30, 30);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.text('ESQUADRÃO', 18, y + 3.8);
+  doc.text('CAFÉ', 95, y + 3.8, { align: 'center' });
+  doc.text('ALMOÇO', 125, y + 3.8, { align: 'center' });
+  doc.text('JANTAR', 155, y + 3.8, { align: 'center' });
+  doc.text('TOTAL ETAPAS', 180, y + 3.8, { align: 'center' });
+  y += 5;
+
+  let grandCafe = 0;
+  let grandAlmoco = 0;
+  let grandJantar = 0;
+  let grandTotal = 0;
+
+  squadronTotals.forEach((st, idx) => {
+    grandCafe += st.cafe;
+    grandAlmoco += st.almoco;
+    grandJantar += st.jantar;
+    grandTotal += st.total;
+
+    if (idx % 2 === 0) {
+      doc.setFillColor(252, 252, 252);
+      doc.rect(15, y, 180, 5, 'F');
+    }
+    doc.setDrawColor(230, 230, 230);
+    doc.rect(15, y, 180, 5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.text(st.squadron, 18, y + 3.8);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text(String(st.cafe), 95, y + 3.8, { align: 'center' });
+    doc.text(String(st.almoco), 125, y + 3.8, { align: 'center' });
+    doc.text(String(st.jantar), 155, y + 3.8, { align: 'center' });
+    doc.text(String(st.total), 180, y + 3.8, { align: 'center' });
+    
+    y += 5;
+  });
+
+  // Total Row
+  doc.setFillColor(250, 240, 240);
+  doc.rect(15, y, 180, 5.5, 'F');
+  doc.setDrawColor(122, 12, 12);
+  doc.rect(15, y, 180, 5.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(122, 12, 12);
+  const totalRowLabel = selectedReparticao === 'Todas' ? 'TOTAL GERAL REGIMENTO' : `TOTAL ${selectedReparticao.toUpperCase()}`;
+  doc.text(totalRowLabel, 18, y + 4.2);
+  doc.text(String(grandCafe), 95, y + 4.2, { align: 'center' });
+  doc.text(String(grandAlmoco), 125, y + 4.2, { align: 'center' });
+  doc.text(String(grandJantar), 155, y + 4.2, { align: 'center' });
+  doc.text(String(grandTotal), 180, y + 4.2, { align: 'center' });
+  
+  y += 15;
 
   // Format full date in Portuguese
   const getFormattedLocationDate = (dStr: string) => {
@@ -465,11 +599,13 @@ export function generateArranchamentoPDF(
     }
   };
 
-  // Location and Date (spaced 10 units below the statistics box bottom, which is y - 17)
+  // Location and Date
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(30, 30, 30);
-  doc.text(getFormattedLocationDate(dateStr), 105, y - 10, { align: 'center' });
+  doc.text(getFormattedLocationDate(dateStr), 105, y, { align: 'center' });
+
+  y += 15;
 
   // Signatures
   doc.setLineWidth(0.35);
@@ -524,67 +660,23 @@ function drawValeDiarioPage(
 
   const dateMeals = meals.filter(m => m.dataRegistro === dateStr);
 
-  // Filter logic based on selectedReparticao
-  const countMealsForGroup = (groupName: 'Oficiais' | 'St/Sgt' | 'CbSd', mealKey: 'cafe' | 'almoco' | 'jantar') => {
-    return dateMeals.filter(m => {
-      if (!m[mealKey]) return false;
-      const userObj = users.find(u => u.usuario.toLowerCase() === m.usuario.toLowerCase());
-      const rep = userObj?.reparticao || m.reparticao || 'Esqd Cap';
-
-      // If a specific department is selected, we filter out users not in that department
-      if (selectedReparticao !== 'Todas') {
-        if (rep.toLowerCase().trim() !== selectedReparticao.toLowerCase().trim()) return false;
-      }
-
-      if (groupName === 'Oficiais') {
-        return rep === 'Oficiais';
-      } else if (groupName === 'St/Sgt') {
-        return rep === 'St/Sgt';
-      } else { // CbSd
-        return ['1º Esqd', '2º Esqd', '3º Esqd', 'Esqd Cap', 'Fanfarra'].includes(rep);
-      }
-    }).length;
+  const getMilitarGroup = (u: FirebaseUser): 'Oficiais' | 'St/Sgt' | 'Cb/Sd' => {
+    return getMilitarGroupFromGraduacao(u.graduacao, u.reparticao, u.grupo);
   };
 
-  const countUniqueForGroup = (groupName: 'Oficiais' | 'St/Sgt' | 'CbSd') => {
-    return dateMeals.filter(m => {
-      if (!m.cafe && !m.almoco && !m.jantar) return false;
-      const userObj = users.find(u => u.usuario.toLowerCase() === m.usuario.toLowerCase());
-      const rep = userObj?.reparticao || m.reparticao || 'Esqd Cap';
+  const SQUADRONS = selectedReparticao === 'Todas' 
+    ? ['1º Esqd C Mec', '2º Esqd C Mec', '3º Esqd C Mec', 'Esqd Cap', 'Fanfarra', 'Visitantes']
+    : [selectedReparticao];
+  
+  const GROUPS: ('Oficiais' | 'St/Sgt' | 'Cb/Sd')[] = ['Oficiais', 'St/Sgt', 'Cb/Sd'];
 
-      if (selectedReparticao !== 'Todas') {
-        if (rep.toLowerCase().trim() !== selectedReparticao.toLowerCase().trim()) return false;
-      }
+  let rowIdx = 0;
+  let rowY = 65;
 
-      if (groupName === 'Oficiais') {
-        return rep === 'Oficiais';
-      } else if (groupName === 'St/Sgt') {
-        return rep === 'St/Sgt';
-      } else { // CbSd
-        return ['1º Esqd', '2º Esqd', '3º Esqd', 'Esqd Cap', 'Fanfarra'].includes(rep);
-      }
-    }).length;
-  };
-
-  const oficiaisCafe = countMealsForGroup('Oficiais', 'cafe');
-  const oficiaisAlmoco = countMealsForGroup('Oficiais', 'almoco');
-  const oficiaisJantar = countMealsForGroup('Oficiais', 'jantar');
-  const oficiaisAlim = countUniqueForGroup('Oficiais');
-
-  const stsgtCafe = countMealsForGroup('St/Sgt', 'cafe');
-  const stsgtAlmoco = countMealsForGroup('St/Sgt', 'almoco');
-  const stsgtJantar = countMealsForGroup('St/Sgt', 'jantar');
-  const stsgtAlim = countUniqueForGroup('St/Sgt');
-
-  const cbsdCafe = countMealsForGroup('CbSd', 'cafe');
-  const cbsdAlmoco = countMealsForGroup('CbSd', 'almoco');
-  const cbsdJantar = countMealsForGroup('CbSd', 'jantar');
-  const cbsdAlim = countUniqueForGroup('CbSd');
-
-  const totalCafe = oficiaisCafe + stsgtCafe + cbsdCafe;
-  const totalAlmoco = oficiaisAlmoco + stsgtAlmoco + cbsdAlmoco;
-  const totalJantar = oficiaisJantar + stsgtJantar + cbsdJantar;
-  const totalAlim = oficiaisAlim + stsgtAlim + cbsdAlim;
+  let grandTotalCafe = 0;
+  let grandTotalAlmoco = 0;
+  let grandTotalJantar = 0;
+  let grandTotalAlim = 0;
 
   const startX = 15;
   const endX = 195;
@@ -701,57 +793,102 @@ function drawValeDiarioPage(
   drawVertical('CF60%', 184, 52);
 
   // 4. Fill Row Data
-  // Row 1: OFICIAIS
-  let rowY = 65;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.text('OFICIAIS', 29, rowY + 5.2, { align: 'center' });
-  doc.text(String(oficiaisCafe), 48, rowY + 5.2, { align: 'center' });
-  doc.text(String(oficiaisAlmoco), 58, rowY + 5.2, { align: 'center' });
-  doc.text(String(oficiaisJantar), 68, rowY + 5.2, { align: 'center' });
-  doc.text(String(oficiaisAlim), 106, rowY + 5.2, { align: 'center' });
-  doc.text('0', 116, rowY + 5.2, { align: 'center' });
-  doc.text(String(oficiaisAlim), 126, rowY + 5.2, { align: 'center' });
-  doc.text('QR', 136, rowY + 5.2, { align: 'center' });
-  doc.text(String(oficiaisAlim), 146, rowY + 5.2, { align: 'center' });
+  SQUADRONS.forEach(sq => {
+    GROUPS.forEach(grp => {
+      let sqAbbr = '';
+      if (sq === '1º Esqd C Mec') sqAbbr = '1º Esqd';
+      else if (sq === '2º Esqd C Mec') sqAbbr = '2º Esqd';
+      else if (sq === '3º Esqd C Mec') sqAbbr = '3º Esqd';
+      else if (sq === 'Esqd Cap') sqAbbr = 'Esqd Cap';
+      else if (sq === 'Fanfarra') sqAbbr = 'Fanf';
+      else if (sq === 'Visitantes') sqAbbr = 'Visit';
+      else sqAbbr = sq.substring(0, 8);
 
-  // Row 2: ST/SGT
-  rowY += 8;
-  doc.text('ST/SGT', 29, rowY + 5.2, { align: 'center' });
-  doc.text(String(stsgtCafe), 48, rowY + 5.2, { align: 'center' });
-  doc.text(String(stsgtAlmoco), 58, rowY + 5.2, { align: 'center' });
-  doc.text(String(stsgtJantar), 68, rowY + 5.2, { align: 'center' });
-  doc.text(String(stsgtAlim), 106, rowY + 5.2, { align: 'center' });
-  doc.text('0', 116, rowY + 5.2, { align: 'center' });
-  doc.text(String(stsgtAlim), 126, rowY + 5.2, { align: 'center' });
-  doc.text('QR', 136, rowY + 5.2, { align: 'center' });
-  doc.text(String(stsgtAlim), 146, rowY + 5.2, { align: 'center' });
+      let grpAbbr = '';
+      if (grp === 'Oficiais') grpAbbr = 'OFIC';
+      else if (grp === 'St/Sgt') grpAbbr = 'SGT';
+      else grpAbbr = 'CB/SD';
 
-  // Row 3: CB/SD
-  rowY += 8;
-  doc.text('CB/SD', 29, rowY + 5.2, { align: 'center' });
-  doc.text(String(cbsdCafe), 48, rowY + 5.2, { align: 'center' });
-  doc.text(String(cbsdAlmoco), 58, rowY + 5.2, { align: 'center' });
-  doc.text(String(cbsdJantar), 68, rowY + 5.2, { align: 'center' });
-  doc.text(String(cbsdAlim), 106, rowY + 5.2, { align: 'center' });
-  doc.text('0', 116, rowY + 5.2, { align: 'center' });
-  doc.text(String(cbsdAlim), 126, rowY + 5.2, { align: 'center' });
-  doc.text('QR', 136, rowY + 5.2, { align: 'center' });
-  doc.text(String(cbsdAlim), 146, rowY + 5.2, { align: 'center' });
+      const label = `${sqAbbr} - ${grpAbbr}`;
+
+      // Count meals for this specific squadron and group
+      const countMealsForSqGroup = (mealKey: 'cafe' | 'almoco' | 'jantar') => {
+        return dateMeals.filter(m => {
+          if (!m[mealKey]) return false;
+          const userObj = users.find(u => isMealForUser(m, u, dateStr));
+          if (!userObj) return false;
+          
+          const rep = userObj.reparticao || 'Esqd Cap';
+          if (normalizeReparticao(rep) !== normalizeReparticao(sq)) return false;
+
+          const g = getMilitarGroup(userObj);
+          return g === grp;
+        }).length;
+      };
+
+      const countUniqueForSqGroup = () => {
+        return dateMeals.filter(m => {
+          if (!m.cafe && !m.almoco && !m.jantar) return false;
+          const userObj = users.find(u => isMealForUser(m, u, dateStr));
+          if (!userObj) return false;
+
+          const rep = userObj.reparticao || 'Esqd Cap';
+          if (normalizeReparticao(rep) !== normalizeReparticao(sq)) return false;
+
+          const g = getMilitarGroup(userObj);
+          return g === grp;
+        }).length;
+      };
+
+      const cafe = countMealsForSqGroup('cafe');
+      const almoco = countMealsForSqGroup('almoco');
+      const jantar = countMealsForSqGroup('jantar');
+      const alim = countUniqueForSqGroup();
+
+      grandTotalCafe += cafe;
+      grandTotalAlmoco += almoco;
+      grandTotalJantar += jantar;
+      grandTotalAlim += alim;
+
+      if (rowIdx < 19) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.0);
+
+        const currentY = rowY + (rowIdx * 8);
+
+        doc.text(label, 29, currentY + 5.2, { align: 'center' });
+        doc.text(String(cafe), 48, currentY + 5.2, { align: 'center' });
+        doc.text(String(almoco), 58, currentY + 5.2, { align: 'center' });
+        doc.text(String(jantar), 68, currentY + 5.2, { align: 'center' });
+
+        doc.text(label, 87, currentY + 5.2, { align: 'center' });
+        doc.text(String(alim), 106, currentY + 5.2, { align: 'center' });
+        doc.text('0', 116, currentY + 5.2, { align: 'center' });
+        doc.text(String(alim), 126, currentY + 5.2, { align: 'center' });
+
+        doc.text('QR', 136, currentY + 5.2, { align: 'center' });
+        doc.text(String(alim), 146, currentY + 5.2, { align: 'center' });
+
+        rowIdx++;
+      }
+    });
+  });
 
   // SOMA Row (y = 217)
   const somaY = 217;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.text('SOMA', 29, somaY + 5.2, { align: 'center' });
-  doc.text(String(totalCafe), 48, somaY + 5.2, { align: 'center' });
-  doc.text(String(totalAlmoco), 58, somaY + 5.2, { align: 'center' });
-  doc.text(String(totalJantar), 68, somaY + 5.2, { align: 'center' });
-  doc.text(String(totalAlim), 106, somaY + 5.2, { align: 'center' });
+  doc.text(String(grandTotalCafe), 48, somaY + 5.2, { align: 'center' });
+  doc.text(String(grandTotalAlmoco), 58, somaY + 5.2, { align: 'center' });
+  doc.text(String(grandTotalJantar), 68, somaY + 5.2, { align: 'center' });
+
+  doc.text('SOMA', 87, somaY + 5.2, { align: 'center' });
+  doc.text(String(grandTotalAlim), 106, somaY + 5.2, { align: 'center' });
   doc.text('0', 116, somaY + 5.2, { align: 'center' });
-  doc.text(String(totalAlim), 126, somaY + 5.2, { align: 'center' });
+  doc.text(String(grandTotalAlim), 126, somaY + 5.2, { align: 'center' });
   doc.text('CF', 136, somaY + 5.2, { align: 'center' });
-  doc.text(String(totalAlim), 146, somaY + 5.2, { align: 'center' });
+  doc.text(String(grandTotalAlim), 146, somaY + 5.2, { align: 'center' });
 
   // 5. Draw Footer (Location, Date and Signatures)
   doc.setFont('helvetica', 'bold');
@@ -781,8 +918,9 @@ export function generateRelatorioMilitaresEsqdPDF(
     format: 'a4',
   });
 
+  const isAll = esquadrao.toLowerCase().trim() === 'todas' || esquadrao.toLowerCase().trim() === 'todos';
   const filteredUsers = users
-    .filter(u => u.reparticao.toLowerCase().trim() === esquadrao.toLowerCase().trim())
+    .filter(u => isAll || u.reparticao.toLowerCase().trim() === esquadrao.toLowerCase().trim())
     .sort((a, b) => a.usuario.localeCompare(b.usuario));
 
   // Outer border - Vinho Color Theme
@@ -926,7 +1064,7 @@ export function generateRelatorioMilitaresEsqdPDF(
     // Print text
     doc.text(String(idx + 1), colX.num + 3, y + 4.2);
     doc.setFont('helvetica', 'bold');
-    doc.text(u.usuario, colX.name + 3, y + 4.2);
+    doc.text(formatMilitaryName(u.usuario, u.graduacao), colX.name + 3, y + 4.2);
     doc.setFont('helvetica', 'normal');
     doc.text(u.reparticao, colX.reparticao + 3, y + 4.2);
     doc.text(u.nivel, colX.nivel + 2, y + 4.2);
@@ -992,3 +1130,171 @@ export function generateRelatorioMilitaresEsqdPDF(
 
   doc.save(`relatorio_militares_${esquadrao.replace(/\s+/g, '_').toLowerCase()}.pdf`);
 }
+
+export function generateLoginsPDF(
+  users: FirebaseUser[],
+  selectedReparticao: string = 'Esqd Cap'
+) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const isAll = selectedReparticao.toLowerCase().trim() === 'todas' || selectedReparticao.toLowerCase().trim() === 'todos';
+  const filteredUsers = users
+    .filter(u => isAll || normalizeReparticao(u.reparticao) === normalizeReparticao(selectedReparticao))
+    .sort((a, b) => {
+      const groupRankOrder: Record<string, number> = {
+        'Cel': 1, 'Ten Cel': 2, 'Maj': 3, 'Cap': 4, '1º Ten': 5, '2º Ten': 6, 'Asp Of': 7, 'Asp': 7,
+        'Subten': 8, 'S Ten': 8, '1º Sgt': 9, '2º Sgt': 10, '3º Sgt': 11,
+        'Cb': 12, 'Sd EP': 13, 'Sd EV': 14, 'Sd': 15
+      };
+      const rankA = groupRankOrder[a.graduacao || ''] || 99;
+      const rankB = groupRankOrder[b.graduacao || ''] || 99;
+      if (rankA !== rankB) return rankA - rankB;
+      return a.usuario.localeCompare(b.usuario);
+    });
+
+  const totalUsers = filteredUsers.length;
+
+  const drawHeaders = (pageNum: number) => {
+    // Outer border - Vinho Theme
+    doc.setDrawColor(122, 12, 12);
+    doc.setLineWidth(0.6);
+    doc.rect(5, 5, 200, 287);
+
+    // Inner border - Ouro Theme
+    doc.setDrawColor(201, 162, 39);
+    doc.setLineWidth(0.25);
+    doc.rect(6.2, 6.2, 197.6, 284.6);
+
+    // Header Text
+    doc.setTextColor(30, 30, 30);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('MINISTÉRIO DA DEFESA', 105, 14, { align: 'center' });
+    doc.text('EXÉRCITO BRASILEIRO', 105, 18, { align: 'center' });
+    doc.text('7º REGIMENTO DE CAVALARIA MECANIZADO', 105, 22, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.text('REGIMENTO DA FRONTEIRA - ARRANCHA+', 105, 26, { align: 'center' });
+
+    doc.setDrawColor(122, 12, 12);
+    doc.setLineWidth(0.4);
+    doc.line(15, 29, 195, 29);
+
+    // Document Title
+    doc.setTextColor(122, 12, 12);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11.5);
+    const repTitle = isAll ? 'TODAS AS SUBUNIDADES' : selectedReparticao.toUpperCase();
+    doc.text(`RELAÇÃO DE LOGINS E SENHAS INICIAIS (${repTitle})`, 105, 36, { align: 'center' });
+
+    // Subtitle notice
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(180, 40, 40);
+    doc.text(`SENHA PADRÃO INICIAL PARA TODOS OS MILITARES: 123456`, 105, 41, { align: 'center' });
+
+    doc.setTextColor(120, 120, 120);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.text(`Total: ${totalUsers} Militares  |  Gerado em: ${new Date().toLocaleString('pt-BR')}`, 15, 46);
+    doc.text(`Página ${pageNum}`, 185, 46);
+  };
+
+  let pageNum = 1;
+  drawHeaders(pageNum);
+
+  let y = 49;
+  const colX = {
+    num: 12,
+    nuc: 20,
+    name: 42,
+    reparticao: 100,
+    login: 135,
+    senha: 172
+  };
+
+  const drawTableHeader = (currentY: number) => {
+    doc.setFillColor(122, 12, 12);
+    doc.rect(10, currentY, 190, 6.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('Nº', colX.num + 1, currentY + 4.5);
+    doc.text('NUC', colX.nuc + 1, currentY + 4.5);
+    doc.text('MILITAR (POSTO / NOME)', colX.name + 1, currentY + 4.5);
+    doc.text('SUBUNIDADE', colX.reparticao + 1, currentY + 4.5);
+    doc.text('LOGIN DE ACESSO', colX.login + 1, currentY + 4.5);
+    doc.text('SENHA INICIAL', colX.senha + 1, currentY + 4.5);
+  };
+
+  drawTableHeader(y);
+  y += 6.5;
+
+  const rowHeight = 6;
+
+  filteredUsers.forEach((u, idx) => {
+    if (y > 270) {
+      doc.addPage();
+      pageNum++;
+      drawHeaders(pageNum);
+      y = 49;
+      drawTableHeader(y);
+      y += 6.5;
+    }
+
+    if (idx % 2 === 0) {
+      doc.setFillColor(252, 252, 252);
+      doc.rect(10, y, 190, rowHeight, 'F');
+    }
+
+    doc.setDrawColor(230, 230, 230);
+    doc.setLineWidth(0.15);
+    doc.rect(10, y, 190, rowHeight);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(30, 30, 30);
+
+    // Nº
+    doc.text(String(idx + 1), colX.num + 1, y + 4.2);
+
+    // NUC
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(50, 50, 50);
+    doc.text(u.nuc || u.id || '-', colX.nuc + 1, y + 4.2);
+
+    // Name
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text(formatMilitaryName(u.usuario, u.graduacao), colX.name + 1, y + 4.2);
+
+    // Subdivisão
+    doc.setFont('helvetica', 'normal');
+    doc.text(u.reparticao || 'Esqd Cap', colX.reparticao + 1, y + 4.2);
+
+    // Login (highlighted)
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(122, 12, 12);
+    doc.text(u.login || cleanTextId(u.usuario), colX.login + 1, y + 4.2);
+
+    // Senha (highlighted)
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(40, 120, 40);
+    doc.text(u.senha || '123456', colX.senha + 1, y + 4.2);
+
+    y += rowHeight;
+  });
+
+  // Footer text
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(120, 120, 120);
+  doc.text('Documento de Credenciais de Acesso - 7º Regimento de Cavalaria Mecanizado - Arrancha+', 105, 283, { align: 'center' });
+
+  doc.save(`logins_senhas_${selectedReparticao.replace(/\s+/g, '_').toLowerCase()}.pdf`);
+}
+

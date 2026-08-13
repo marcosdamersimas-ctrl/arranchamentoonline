@@ -1,8 +1,25 @@
 import React, { useState } from 'react';
 import { FirebaseUser, UserNivel } from '../types';
-import { Users, UserPlus, Trash2, Award, Lock, Shield, User, Building, Search, Filter } from 'lucide-react';
+import { 
+  Users, 
+  UserPlus, 
+  Trash2, 
+  Award, 
+  Shield, 
+  QrCode, 
+  ArrowLeft, 
+  Search, 
+  CheckCircle2, 
+  AlertCircle, 
+  Printer, 
+  Copy, 
+  Check, 
+  User, 
+  Building,
+  Key
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cleanTextId } from '../utils/storage';
+import { cleanTextId, formatMilitaryName, normalizeReparticao, generateUniqueUserId, getMilitarGroupFromGraduacao } from '../utils/storage';
 
 interface AdminProps {
   user: FirebaseUser;
@@ -13,13 +30,12 @@ interface AdminProps {
 }
 
 const REPARTICOES = [
-  'Oficiais',
-  'St/Sgt',
-  '1º Esqd',
-  '2º Esqd',
-  '3º Esqd',
+  '1º Esqd C Mec',
+  '2º Esqd C Mec',
+  '3º Esqd C Mec',
   'Esqd Cap',
-  'Fanfarra'
+  'Fanfarra',
+  'Visitantes'
 ];
 
 const GRADUACOES = [
@@ -40,155 +56,384 @@ const GRADUACOES = [
 
 const NIVEIS: UserNivel[] = ['Militar', 'Furriel', 'Administrador'];
 
+type AdminModule = 'menu' | 'cadastrar' | 'excluir' | 'classificar' | 'funcao' | 'qrcode';
+
 export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUserByAdmin }: AdminProps) {
-  
-  // Create user manual dialog state
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [activeModule, setActiveModule] = useState<AdminModule>('menu');
+
+  // 1. Cadastrar Usuário State
   const [newUsuario, setNewUsuario] = useState('');
+  const [newLogin, setNewLogin] = useState('');
+  const [newNuc, setNewNuc] = useState('');
   const [newReparticao, setNewReparticao] = useState(REPARTICOES[0]);
-  const [newSenha, setNewSenha] = useState('123');
-  const [newNivel, setNewNivel] = useState<UserNivel>('Militar');
   const [newGraduacao, setNewGraduacao] = useState('Sd');
+  const [newSenha, setNewSenha] = useState('123456');
+  const [newNivel, setNewNivel] = useState<UserNivel>('Militar');
+  const [addMsg, setAddMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // Filter states
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedEsquadraoFilter, setSelectedEsquadraoFilter] = useState('Todos');
-  const [selectedGraduacaoFilter, setSelectedGraduacaoFilter] = useState('Todas');
+  // 2. Excluir Usuário State
+  const [deleteSearch, setDeleteSearch] = useState('');
+  const [deleteMsg, setDeleteMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // Selected user state for single-row management
-  const [selectedUserId, setSelectedUserId] = useState<string>(user.id);
+  // 3. Classificar State (Trocar Esquadrão e Graduação)
+  const [classUserId, setClassUserId] = useState('');
+  const [classReparticao, setClassReparticao] = useState(REPARTICOES[0]);
+  const [classGraduacao, setClassGraduacao] = useState('Sd');
+  const [classMsg, setClassMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
+  // 4. Definir Função State (Usuário, Furriel, Admin)
+  const [roleUserId, setRoleUserId] = useState('');
+  const [roleNivel, setRoleNivel] = useState<UserNivel>('Militar');
+  const [roleMsg, setRoleMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const handleManualAdd = (e: React.FormEvent) => {
+  // 5. QR Code State
+  const siteUrl = window.location.origin;
+  const [copied, setCopied] = useState(false);
+
+  // Handlers
+  const handleAddUserSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError('');
-    setFormSuccess('');
+    setAddMsg(null);
 
-    if (!newUsuario.trim() || !newSenha.trim()) {
-      setFormError('Por favor, preencha todos os campos.');
+    if (!newUsuario.trim()) {
+      setAddMsg({ text: 'Por favor, informe o Nome de Guerra.', type: 'error' });
       return;
     }
 
-    const normalizedId = cleanTextId(newUsuario);
-    if (users.some(u => cleanTextId(u.usuario) === normalizedId)) {
-      setFormError('Já existe um militar cadastrado com este nome de guerra.');
+    const nucFinal = newNuc.trim() || generateUniqueUserId();
+    const loginFinal = newLogin.trim() ? cleanTextId(newLogin) : cleanTextId(newUsuario);
+    const idFinal = nucFinal;
+
+    // Check duplicate login or NUC
+    const duplicate = users.find(u => u.id === idFinal || (u.login && cleanTextId(u.login) === loginFinal));
+    if (duplicate) {
+      setAddMsg({ text: `Já existe um militar com este NUC (${nucFinal}) ou login (${loginFinal}).`, type: 'error' });
       return;
     }
 
-    if (newNivel === 'Furriel' && (newReparticao === 'Oficiais' || newReparticao === 'St/Sgt')) {
-      setFormError('Os furriéis devem ser cadastrados por esquadrão. Oficiais e sargentos não precisam de furriel.');
-      return;
-    }
+    const grupoCalculado = getMilitarGroupFromGraduacao(newGraduacao, newReparticao);
 
-    const newUser: FirebaseUser = {
-      id: normalizedId,
-      usuario: newUsuario.trim(),
+    const newUserObj: FirebaseUser = {
+      id: idFinal,
+      nuc: nucFinal,
+      login: loginFinal,
+      usuario: newUsuario.trim().toUpperCase(),
       reparticao: newReparticao,
-      senha: newSenha,
+      graduacao: newGraduacao,
+      grupo: grupoCalculado,
+      senha: newSenha || '123456',
       nivel: newNivel,
-      graduacao: newGraduacao
+      tentativasIncorretas: 0,
+      bloqueado: false,
+      trocarSenhaNoPrimeiroAcesso: true,
+      approved: true
     };
 
-    onAddUserByAdmin(newUser);
-    setFormSuccess('Militar inserido e ativado com sucesso no sistema!');
+    onAddUserByAdmin(newUserObj);
+    setAddMsg({ text: `Militar ${newUserObj.usuario} cadastrado com sucesso! (NUC: ${nucFinal})`, type: 'success' });
     
-    // Clear
+    // Reset form
     setNewUsuario('');
-    setNewSenha('123');
-    setNewGraduacao('Sd');
-    setTimeout(() => {
-      setShowAddForm(false);
-      setFormSuccess('');
-    }, 1500);
+    setNewLogin('');
+    setNewNuc('');
+    setNewSenha('123456');
   };
 
-  const handleSearchChange = (val: string) => {
-    setSearchQuery(val);
+  const handleDeleteUser = (u: FirebaseUser) => {
+    if (u.nivel === 'Administrador' && users.filter(item => item.nivel === 'Administrador').length <= 1) {
+      alert('O sistema precisa manter pelo menos um Administrador. Promova outro usuário antes de excluir este acesso.');
+      return;
+    }
+
+    if (confirm(`Tem certeza que deseja apagar permanentemente o militar ${u.usuario} (${u.reparticao}) da base de dados?`)) {
+      onDeleteUser(u.id);
+      setDeleteMsg({ text: `Militar ${u.usuario} excluído com sucesso da base de dados!`, type: 'success' });
+      setTimeout(() => setDeleteMsg(null), 3000);
+    }
   };
 
-  const handleEsquadraoFilterChange = (val: string) => {
-    setSelectedEsquadraoFilter(val);
+  const handleClassifySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setClassMsg(null);
+    if (!classUserId) {
+      setClassMsg({ text: 'Selecione um militar para alterar.', type: 'error' });
+      return;
+    }
+
+    const grupo = getMilitarGroupFromGraduacao(classGraduacao, classReparticao);
+    onUpdateUser(classUserId, {
+      reparticao: classReparticao,
+      graduacao: classGraduacao,
+      grupo
+    });
+
+    const target = users.find(u => u.id === classUserId);
+    setClassMsg({ text: `Esquadrão e Graduação de ${target?.usuario || 'Militar'} atualizados com sucesso!`, type: 'success' });
   };
 
-  const handleGraduacaoFilterChange = (val: string) => {
-    setSelectedGraduacaoFilter(val);
+  const handleRoleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRoleMsg(null);
+    if (!roleUserId) {
+      setRoleMsg({ text: 'Selecione um militar para alterar a função.', type: 'error' });
+      return;
+    }
+
+    const target = users.find(u => u.id === roleUserId);
+    if (target?.nivel === 'Administrador' && roleNivel !== 'Administrador' && users.filter(item => item.nivel === 'Administrador').length <= 1) {
+      setRoleMsg({ text: 'O sistema precisa manter pelo menos um Administrador.', type: 'error' });
+      return;
+    }
+
+    onUpdateUser(roleUserId, { nivel: roleNivel });
+    setRoleMsg({ text: `Função de ${target?.usuario || 'Militar'} alterada para ${roleNivel.toUpperCase()}!`, type: 'success' });
   };
 
-  const filteredUsers = users.filter(u => {
-    const matchesSearch = u.usuario.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesEsquadrao = selectedEsquadraoFilter === 'Todos' || u.reparticao === selectedEsquadraoFilter;
-    const matchesGraduacao = selectedGraduacaoFilter === 'Todas' || u.graduacao === selectedGraduacaoFilter;
-    return matchesSearch && matchesEsquadrao && matchesGraduacao;
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(siteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handlePrintQRCode = () => {
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=7a0c0c&data=${encodeURIComponent(siteUrl)}`;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>QR Code de Acesso - 7º RC Mec</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 40px; }
+    .card { border: 3px solid #7a0c0c; border-radius: 20px; padding: 30px; display: inline-block; }
+    h1 { color: #7a0c0c; margin-bottom: 5px; }
+    h2 { color: #555; font-size: 16px; margin-bottom: 25px; }
+    img { width: 250px; height: 250px; }
+    p { color: #888; font-size: 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>7º REGIMENTO DE CAVALARIA MECANIZADO</h1>
+    <h2>ARRANCHA+ — ACESSO RÁPIDO</h2>
+    <img src="${qrImageUrl}" alt="QR Code Acesso" />
+    <p>Aponte a câmera do seu celular para acessar o site de Arranchamento.</p>
+  </div>
+  <script>window.print();</script>
+</body>
+</html>
+    `);
+    printWindow.document.close();
+  };
+
+  // Filtered users for delete tab
+  const filteredUsersForDelete = users.filter(u => {
+    if (!deleteSearch.trim()) return true;
+    const term = cleanTextId(deleteSearch);
+    return cleanTextId(u.usuario).includes(term) || 
+           (u.nuc && u.nuc.includes(term)) ||
+           (u.login && cleanTextId(u.login).includes(term)) ||
+           cleanTextId(u.reparticao).includes(term);
   });
 
-  const totalItems = filteredUsers.length;
-
-  const currentSelectedUser = filteredUsers.find(u => u.id === selectedUserId) 
-    || filteredUsers[0] 
-    || users.find(u => u.id === selectedUserId) 
-    || users.find(u => u.id === user.id) 
-    || users[0];
-
   return (
-    <div className="space-y-6 font-sans text-grafite" id="admin-panel">
+    <div className="space-y-6 font-sans text-grafite pb-10">
       
-      {/* Header Panel */}
-      <div className="bg-white p-6 border border-gray-200/60 rounded-3xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Module Title Header */}
+      <div className="bg-white p-6 rounded-3xl border border-gray-200/60 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-vinho animate-pulse shrink-0" />
-            Central de Administração
-          </h3>
+          <h2 className="text-2xl font-display font-black text-vinho tracking-tight flex items-center gap-2">
+            <Shield className="w-6 h-6 text-ouro" />
+            Painel do Administrador
+          </h2>
           <p className="text-xs text-gray-500 font-semibold mt-1">
-            Controle total de permissões, inserção física de novos usuários e auditoria de credenciais.
+            Gestão completa de militares, funções, esquadrões e acessos ao sistema.
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setFormError('');
-            setFormSuccess('');
-            setShowAddForm(!showAddForm);
-          }}
-          className="w-full sm:w-auto bg-vinho hover:bg-vinho-escuro text-white font-display font-bold py-3 px-5 rounded-2xl text-xs flex items-center justify-center gap-1.5 cursor-pointer border border-transparent hover:border-ouro shadow-md shadow-vinho/10 transition-all"
-          id="btn-manual-add"
-        >
-          <UserPlus className="w-4 h-4 text-ouro" />
-          <span>Cadastrar Militar Manual</span>
-        </button>
+        {activeModule !== 'menu' && (
+          <button
+            onClick={() => setActiveModule('menu')}
+            className="px-5 py-2.5 bg-vinho text-white rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-vinho-dark transition-all shadow-md active:scale-95 cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar ao Menu Admin
+          </button>
+        )}
       </div>
 
-      {/* Manual Creation Form Dropdown */}
-      <AnimatePresence>
-        {showAddForm && (
-          <motion.div 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm overflow-hidden"
+      {/* ------------------- MAIN MENU GRID OF 5 BIG BUTTONS ------------------- */}
+      {activeModule === 'menu' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          {/* Button 1: Cadastrar Usuário */}
+          <button
+            onClick={() => setActiveModule('cadastrar')}
+            className="group text-left bg-white p-7 rounded-3xl border-2 border-gray-200/80 hover:border-vinho/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[190px]"
           >
-            <h4 className="text-xs font-display font-black text-vinho uppercase tracking-wider mb-4 flex items-center gap-1.5">
-              <Award className="w-4 h-4 text-ouro" />
-              Inserir Militar Manualmente no Banco de Dados
-            </h4>
-            
-            {formError && (
-              <p className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-xl p-3 mb-4 font-semibold">{formError}</p>
-            )}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-vinho/5 rounded-bl-full transition-transform group-hover:scale-110" />
+            <div className="flex items-center gap-4 mb-4 relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-vinho text-ouro flex items-center justify-center shadow-md shrink-0 border border-ouro/30">
+                <UserPlus className="w-7 h-7" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase text-ouro tracking-widest block">Ação do Admin</span>
+                <h3 className="text-lg font-display font-black text-vinho leading-tight">Cadastrar Militar</h3>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 font-medium relative z-10">
+              Adicione um novo militar ao sistema com NUC individual, posto/graduação e esquadrão.
+            </p>
+          </button>
 
-            {formSuccess && (
-              <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-4 font-semibold">{formSuccess}</p>
-            )}
+          {/* Button 2: Excluir Usuário */}
+          <button
+            onClick={() => setActiveModule('excluir')}
+            className="group text-left bg-white p-7 rounded-3xl border-2 border-gray-200/80 hover:border-red-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[190px]"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-bl-full transition-transform group-hover:scale-110" />
+            <div className="flex items-center gap-4 mb-4 relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-red-700 text-white flex items-center justify-center shadow-md shrink-0 border border-red-800">
+                <Trash2 className="w-7 h-7" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase text-red-500 tracking-widest block">Remoção</span>
+                <h3 className="text-lg font-display font-black text-red-900 leading-tight">Excluir Militar</h3>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 font-medium relative z-10">
+              Remova militares da base de dados com confirmação e exclusão permanente.
+            </p>
+          </button>
 
-            <form onSubmit={handleManualAdd} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-              <div className="md:col-span-2">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1"><Award className="w-3 h-3 text-vinho" />Graduação</label>
+          {/* Button 3: Trocar Esquadrão e Graduação */}
+          <button
+            onClick={() => setActiveModule('classificar')}
+            className="group text-left bg-white p-7 rounded-3xl border-2 border-gray-200/80 hover:border-amber-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[190px]"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full transition-transform group-hover:scale-110" />
+            <div className="flex items-center gap-4 mb-4 relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-md shrink-0 border border-amber-700">
+                <Building className="w-7 h-7" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase text-amber-600 tracking-widest block">Classificação</span>
+                <h3 className="text-lg font-display font-black text-vinho leading-tight">Trocar Esquadrão / Graduação</h3>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 font-medium relative z-10">
+              Altere a subunidade/esquadrão e o posto ou graduação de qualquer militar.
+            </p>
+          </button>
+
+          {/* Button 4: Definir Função (Usuário / Furriel / Admin) */}
+          <button
+            onClick={() => setActiveModule('funcao')}
+            className="group text-left bg-white p-7 rounded-3xl border-2 border-gray-200/80 hover:border-blue-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[190px]"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full transition-transform group-hover:scale-110" />
+            <div className="flex items-center gap-4 mb-4 relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-blue-700 text-white flex items-center justify-center shadow-md shrink-0 border border-blue-800">
+                <Shield className="w-7 h-7" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase text-blue-600 tracking-widest block">Nível de Acesso</span>
+                <h3 className="text-lg font-display font-black text-vinho leading-tight">Definir Função (Nível)</h3>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 font-medium relative z-10">
+              Defina quem é Usuário, Furriel ou Administrador no sistema de forma permanente.
+            </p>
+          </button>
+
+          {/* Button 5: Gerar QR Code de Acesso */}
+          <button
+            onClick={() => setActiveModule('qrcode')}
+            className="group text-left bg-white p-7 rounded-3xl border-2 border-gray-200/80 hover:border-emerald-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[190px]"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-full transition-transform group-hover:scale-110" />
+            <div className="flex items-center gap-4 mb-4 relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-md shrink-0 border border-emerald-800">
+                <QrCode className="w-7 h-7" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest block">Acesso Rápido</span>
+                <h3 className="text-lg font-display font-black text-vinho leading-tight">Gerar QR Code do Site</h3>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 font-medium relative z-10">
+              Gere e imprima o QR Code de acesso ao site para ser afixado nas subunidades.
+            </p>
+          </button>
+
+        </div>
+      )}
+
+      {/* ------------------- MODULE 1: CADASTRAR MILITAR ------------------- */}
+      {activeModule === 'cadastrar' && (
+        <div className="bg-white p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-3xl mx-auto space-y-6">
+          <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
+            <UserPlus className="w-6 h-6 text-vinho" />
+            <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight">
+              Cadastrar Novo Militar
+            </h3>
+          </div>
+
+          {addMsg && (
+            <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+              addMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+            }`}>
+              {addMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
+              <span>{addMsg.text}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleAddUserSubmit} className="space-y-4 text-xs font-semibold">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              <div>
+                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Nome de Guerra *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: SILVA"
+                  value={newUsuario}
+                  onChange={(e) => setNewUsuario(e.target.value.toUpperCase())}
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Login de Acesso (Opicional)</label>
+                <input
+                  type="text"
+                  placeholder="Ex: 3sgtsilva (deixe em branco p/ gerar)"
+                  value={newLogin}
+                  onChange={(e) => setNewLogin(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Número Único (NUC) *</label>
+                <input
+                  type="text"
+                  placeholder="Ex: 10000100 (deixe em branco p/ automático)"
+                  value={newNuc}
+                  onChange={(e) => setNewNuc(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Posto / Graduação</label>
                 <select
                   value={newGraduacao}
-                  onChange={e => setNewGraduacao(e.target.value)}
-                  className="w-full bg-[#F9F9F9] border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-grafite focus:outline-none focus:border-vinho cursor-pointer font-semibold"
+                  onChange={(e) => setNewGraduacao(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
                 >
                   {GRADUACOES.map(g => (
                     <option key={g} value={g}>{g}</option>
@@ -196,261 +441,369 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                 </select>
               </div>
 
-              <div className="md:col-span-3">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1"><User className="w-3 h-3 text-vinho" />Nome de Guerra</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Ten Simas"
-                  value={newUsuario}
-                  onChange={e => setNewUsuario(e.target.value)}
-                  className="w-full bg-[#F9F9F9] border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-grafite placeholder-gray-400 focus:outline-none focus:border-vinho font-semibold"
-                />
-              </div>
-
-              <div className="md:col-span-3">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1"><Building className="w-3 h-3 text-vinho" />Subdivisão / Seção</label>
+              <div>
+                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Esquadrão / Subunidade</label>
                 <select
                   value={newReparticao}
-                  onChange={e => setNewReparticao(e.target.value)}
-                  className="w-full bg-[#F9F9F9] border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-grafite focus:outline-none focus:border-vinho cursor-pointer font-semibold"
+                  onChange={(e) => setNewReparticao(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
                 >
-                  {REPARTICOES.map(s => (
-                    <option key={s} value={s}>{s}</option>
+                  {REPARTICOES.map(r => (
+                    <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
               </div>
 
+              <div>
+                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Nível de Acesso</label>
+                <select
+                  value={newNivel}
+                  onChange={(e) => setNewNivel(e.target.value as UserNivel)}
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                >
+                  <option value="Militar">Usuário (Militar)</option>
+                  <option value="Furriel">Furriel</option>
+                  <option value="Administrador">Administrador</option>
+                </select>
+              </div>
+
               <div className="md:col-span-2">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1"><Lock className="w-3 h-3 text-vinho" />Senha Inicial</label>
+                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Senha Inicial</label>
                 <input
                   type="text"
-                  required
-                  placeholder="Ex: 123"
                   value={newSenha}
-                  onChange={e => setNewSenha(e.target.value)}
-                  className="w-full bg-[#F9F9F9] border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-grafite focus:outline-none focus:border-vinho font-mono"
+                  onChange={(e) => setNewSenha(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-mono"
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1"><Shield className="w-3 h-3 text-vinho" />Nível Acesso</label>
-                <select
-                  value={newNivel}
-                  onChange={e => setNewNivel(e.target.value as UserNivel)}
-                  className="w-full bg-[#F9F9F9] border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-grafite focus:outline-none focus:border-vinho cursor-pointer font-semibold"
-                >
-                  {NIVEIS.map(n => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="md:col-span-12 flex justify-end mt-2">
-                <button
-                  type="submit"
-                  className="bg-vinho hover:bg-vinho-escuro text-white text-xs font-display font-bold py-2.5 px-6 rounded-xl cursor-pointer shadow-sm transition-all text-center"
-                >
-                  Gravar Registro
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Directory of registered personnel */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-4" id="directory-panel">
-        
-        {/* Filter controls panel */}
-        <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 bg-gray-50/50 p-4 border border-gray-150 rounded-2xl">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-vinho" />
-            <h4 className="text-xs font-display font-black text-vinho uppercase tracking-wider">
-              Filtros de Gerenciamento ({totalItems} militares)
-            </h4>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 grow max-w-4xl">
-            {/* Esquadrão filter */}
-            <div className="relative">
-              <select
-                value={selectedEsquadraoFilter}
-                onChange={e => handleEsquadraoFilterChange(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-grafite focus:outline-none focus:border-vinho cursor-pointer font-semibold"
-              >
-                <option value="Todos">Todos os Esquadrões</option>
-                {REPARTICOES.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
             </div>
 
-            {/* Graduação filter */}
-            <div className="relative">
-              <select
-                value={selectedGraduacaoFilter}
-                onChange={e => handleGraduacaoFilterChange(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-grafite focus:outline-none focus:border-vinho cursor-pointer font-semibold"
+            <div className="pt-4 flex justify-end">
+              <button
+                type="submit"
+                className="w-full md:w-auto px-8 py-3 bg-vinho text-white rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-vinho-dark transition-all shadow-md active:scale-95 cursor-pointer"
               >
-                <option value="Todas">Todas as Graduações</option>
-                {GRADUACOES.map(g => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
+                Cadastrar Militar na Base de Dados
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ------------------- MODULE 2: EXCLUIR MILITAR ------------------- */}
+      {activeModule === 'excluir' && (
+        <div className="bg-white p-8 rounded-3xl border border-gray-200/80 shadow-sm space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <Trash2 className="w-6 h-6 text-red-700" />
+              <h3 className="text-xl font-display font-black text-red-900 uppercase tracking-tight">
+                Excluir Militar da Base de Dados
+              </h3>
             </div>
 
-            {/* Search box */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            {/* Search Input */}
+            <div className="relative w-full md:w-72">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
               <input
                 type="text"
-                placeholder="Buscar por nome..."
-                value={searchQuery}
-                onChange={e => handleSearchChange(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-xs text-grafite placeholder-gray-400 focus:outline-none focus:border-vinho font-semibold"
+                placeholder="Buscar por nome, NUC, login..."
+                value={deleteSearch}
+                onChange={(e) => setDeleteSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-2xl border border-gray-300 text-xs focus:outline-none focus:border-red-600 bg-gray-50"
               />
             </div>
           </div>
-        </div>
 
-        {/* Directory Table exactly matching user layout specifications */}
-        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-inner" id="accounts-table-container">
-          <table className="w-full border-collapse text-left text-xs text-grafite">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-display font-black uppercase tracking-wider text-[10px]">
-                <th className="px-5 py-4 w-[25%]">Seleção do Esqd</th>
-                <th className="px-5 py-4 w-[20%]">Graduação</th>
-                <th className="px-5 py-4 w-[25%]">Nome de Guerra</th>
-                <th className="px-5 py-4 w-[20%]">Nível de Acesso</th>
-                <th className="px-5 py-4 text-right w-[10%]">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
-              {!currentSelectedUser ? (
+          {deleteMsg && (
+            <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>{deleteMsg.text}</span>
+            </div>
+          )}
+
+          {/* Table List */}
+          <div className="overflow-x-auto rounded-2xl border border-gray-200">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-100 text-gray-700 font-bold uppercase tracking-wider border-b border-gray-200">
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-gray-400 font-bold">
-                    Nenhum militar localizado com os filtros selecionados.
-                  </td>
+                  <th className="p-3.5">NUC</th>
+                  <th className="p-3.5">Nome / Graduação</th>
+                  <th className="p-3.5">Esquadrão</th>
+                  <th className="p-3.5">Login</th>
+                  <th className="p-3.5">Nível</th>
+                  <th className="p-3.5 text-right">Ação</th>
                 </tr>
-              ) : (
-                (() => {
-                  const u = currentSelectedUser;
-                  const isOwnAccount = u.id === cleanTextId(user.usuario);
-                  return (
-                    <tr key={u.id} className="hover:bg-gray-50/50 transition-all">
-                      
-                      {/* Column 1: Seleção do Esqd */}
-                      <td className="px-5 py-3">
-                        <select
-                          value={u.reparticao}
-                          onChange={e => onUpdateUser(u.id, { reparticao: e.target.value })}
-                          className="bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs text-grafite font-semibold focus:outline-none focus:border-vinho cursor-pointer w-full max-w-[180px] shadow-sm hover:border-gray-300 transition-all"
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredUsersForDelete.map((u) => (
+                  <tr key={u.id} className="hover:bg-red-50/40 transition-colors">
+                    <td className="p-3.5 font-mono font-bold text-gray-600">{u.nuc || u.id}</td>
+                    <td className="p-3.5 font-bold text-vinho">
+                      {formatMilitaryName(u.usuario, u.graduacao)}
+                    </td>
+                    <td className="p-3.5 text-gray-600 font-medium">{u.reparticao}</td>
+                    <td className="p-3.5 text-gray-500 font-mono">{u.login || '—'}</td>
+                    <td className="p-3.5 font-bold text-xs">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] uppercase ${
+                        u.nivel === 'Administrador' ? 'bg-purple-100 text-purple-800' :
+                        u.nivel === 'Furriel' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {u.nivel}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-right">
+                      {u.nivel === 'Administrador' && users.filter(item => item.nivel === 'Administrador').length <= 1 ? (
+                        <span className="text-[10px] text-gray-400 font-bold uppercase">Único Administrador</span>
+                      ) : (
+                        <button
+                          onClick={() => handleDeleteUser(u)}
+                          className="px-3.5 py-1.5 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-all shadow-sm active:scale-95 cursor-pointer"
                         >
-                          {REPARTICOES.map(r => (
-                            <option key={r} value={r}>{r}</option>
-                          ))}
-                        </select>
-                      </td>
+                          Excluir
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
 
-                      {/* Column 2: Graduação do Militar */}
-                      <td className="px-5 py-3">
-                        <select
-                          value={u.graduacao || 'Sd'}
-                          onChange={e => onUpdateUser(u.id, { graduacao: e.target.value })}
-                          className="bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs text-grafite font-semibold focus:outline-none focus:border-vinho cursor-pointer w-full max-w-[120px] shadow-sm hover:border-gray-300 transition-all"
-                        >
-                          {GRADUACOES.map(g => (
-                            <option key={g} value={g}>{g}</option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {/* Column 3: Nome do Militar (Seletor com todos os militares cadastrados) */}
-                      <td className="px-5 py-3">
-                        <div className="flex flex-col max-w-[200px]">
-                          <select
-                            value={u.id}
-                            onChange={e => {
-                              setSelectedUserId(e.target.value);
-                            }}
-                            className="bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs text-vinho font-bold focus:outline-none focus:border-vinho cursor-pointer w-full max-w-[200px] shadow-sm hover:border-gray-300 transition-all"
-                          >
-                            {users.map(usr => (
-                              <option key={usr.id} value={usr.id}>
-                                {usr.usuario}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="text-[9px] text-gray-400 font-mono px-2 mt-1">Senha Física: {u.senha}</span>
-                        </div>
-                      </td>
-
-                      {/* Column 4: Nível de Acesso */}
-                      <td className="px-5 py-3">
-                        <select
-                          value={u.nivel}
-                          onChange={e => onUpdateUser(u.id, { nivel: e.target.value as UserNivel })}
-                          className={`text-[10px] font-extrabold uppercase border border-gray-250 rounded-xl px-3 py-1.5 focus:outline-none cursor-pointer shadow-sm transition-all ${
-                            u.nivel === 'Administrador' 
-                              ? 'text-vinho bg-red-50 border-red-200/60' 
-                              : u.nivel === 'Furriel'
-                              ? 'text-amber-700 bg-amber-50 border-amber-200/60'
-                              : 'text-gray-600 bg-gray-50 border-gray-200/60'
-                          }`}
-                        >
-                          {NIVEIS.map(lvl => (
-                            <option key={lvl} value={lvl}>{lvl}</option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {/* Column 5: Ações */}
-                      <td className="px-5 py-3 text-right">
-                        {isOwnAccount ? (
-                          <span className="text-[9px] font-bold text-gray-400 italic">Minha Conta</span>
-                        ) : (
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => {
-                                const newPass = prompt(`Defina a nova senha para ${u.usuario}:`, u.senha);
-                                if (newPass !== null && newPass.trim() !== '') {
-                                  onUpdateUser(u.id, { senha: newPass.trim() });
-                                }
-                              }}
-                              className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-xl border border-gray-200 hover:border-gray-300 transition-all cursor-pointer"
-                              title="Redefinir Senha do Militar"
-                            >
-                              <Lock className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (confirm(`Tem certeza que deseja apagar permanentemente o registro de ${u.usuario} do sistema?`)) {
-                                  onDeleteUser(u.id);
-                                }
-                              }}
-                              className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-all inline-flex items-center justify-center cursor-pointer border border-transparent hover:border-red-200"
-                              title="Excluir Conta Permanentemente"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-
-                    </tr>
-                  );
-                })()
-              )}
-            </tbody>
-          </table>
+                {filteredUsersForDelete.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-6 text-center text-gray-400 font-medium">
+                      Nenhum militar encontrado com o termo pesquisado.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+      )}
 
-        <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold pt-1">
-          <span>Você pode alterar os campos de qualquer militar alterando a caixa seletora correspondente ou selecionando seu nome de guerra.</span>
-          <span>Aprovação automática ao criar ou editar.</span>
+      {/* ------------------- MODULE 3: TROCAR ESQUADRÃO E GRADUAÇÃO ------------------- */}
+      {activeModule === 'classificar' && (
+        <div className="bg-white p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-3xl mx-auto space-y-6">
+          <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
+            <Building className="w-6 h-6 text-amber-600" />
+            <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight">
+              Trocar Esquadrão e Graduação
+            </h3>
+          </div>
+
+          {classMsg && (
+            <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+              classMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+            }`}>
+              {classMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
+              <span>{classMsg.text}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleClassifySubmit} className="space-y-5 text-xs font-semibold">
+            <div>
+              <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Selecione o Militar *</label>
+              <select
+                value={classUserId}
+                onChange={(e) => {
+                  setClassUserId(e.target.value);
+                  const selected = users.find(u => u.id === e.target.value);
+                  if (selected) {
+                    setClassReparticao(selected.reparticao || REPARTICOES[0]);
+                    setClassGraduacao(selected.graduacao || 'Sd');
+                  }
+                }}
+                className="w-full p-3.5 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+              >
+                <option value="">-- Selecione o militar --</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {formatMilitaryName(u.usuario, u.graduacao)} — {u.reparticao} (NUC: {u.nuc || u.id})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Novo Posto / Graduação</label>
+                <select
+                  value={classGraduacao}
+                  onChange={(e) => setClassGraduacao(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                >
+                  {GRADUACOES.map(g => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Novo Esquadrão / Subunidade</label>
+                <select
+                  value={classReparticao}
+                  onChange={(e) => setClassReparticao(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                >
+                  {REPARTICOES.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end">
+              <button
+                type="submit"
+                className="w-full md:w-auto px-8 py-3 bg-amber-600 text-white rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-amber-700 transition-all shadow-md active:scale-95 cursor-pointer"
+              >
+                Salvar Alterações de Classificação
+              </button>
+            </div>
+          </form>
         </div>
-      </div>
+      )}
+
+      {/* ------------------- MODULE 4: DEFINIR FUNÇÃO (NÍVEL DE ACESSO) ------------------- */}
+      {activeModule === 'funcao' && (
+        <div className="bg-white p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-3xl mx-auto space-y-6">
+          <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
+            <Shield className="w-6 h-6 text-blue-700" />
+            <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight">
+              Definir Nível de Acesso (Usuário / Furriel / Admin)
+            </h3>
+          </div>
+
+          {roleMsg && (
+            <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+              roleMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+            }`}>
+              {roleMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
+              <span>{roleMsg.text}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleRoleSubmit} className="space-y-5 text-xs font-semibold">
+            <div>
+              <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Selecione o Militar *</label>
+              <select
+                value={roleUserId}
+                onChange={(e) => {
+                  setRoleUserId(e.target.value);
+                  const selected = users.find(u => u.id === e.target.value);
+                  if (selected) {
+                    setRoleNivel(selected.nivel);
+                  }
+                }}
+                className="w-full p-3.5 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+              >
+                <option value="">-- Selecione o militar --</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {formatMilitaryName(u.usuario, u.graduacao)} — {u.reparticao} (Nível Atual: {u.nivel})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-2 font-bold">Novo Nível de Acesso</label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                
+                <button
+                  type="button"
+                  onClick={() => setRoleNivel('Militar')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                    roleNivel === 'Militar' ? 'border-vinho bg-vinho/5 shadow-sm' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                  }`}
+                >
+                  <User className="w-5 h-5 text-gray-600 mb-1" />
+                  <span className="font-bold block text-sm text-vinho">Usuário</span>
+                  <span className="text-[10px] text-gray-500 font-normal">Acesso comum para arranchamento e alteração de senha.</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRoleNivel('Furriel')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                    roleNivel === 'Furriel' ? 'border-amber-500 bg-amber-500/5 shadow-sm' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                  }`}
+                >
+                  <Award className="w-5 h-5 text-amber-600 mb-1" />
+                  <span className="font-bold block text-sm text-amber-900">Furriel</span>
+                  <span className="text-[10px] text-gray-500 font-normal">Visualiza arranchamento do esquadrão, vale diário e impressão.</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRoleNivel('Administrador')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                    roleNivel === 'Administrador' ? 'border-purple-600 bg-purple-600/5 shadow-sm' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                  }`}
+                >
+                  <Shield className="w-5 h-5 text-purple-600 mb-1" />
+                  <span className="font-bold block text-sm text-purple-900">Administrador</span>
+                  <span className="text-[10px] text-gray-500 font-normal">Acesso total ao painel admin e controle de cadastros.</span>
+                </button>
+
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end">
+              <button
+                type="submit"
+                className="w-full md:w-auto px-8 py-3 bg-blue-700 text-white rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-blue-800 transition-all shadow-md active:scale-95 cursor-pointer"
+              >
+                Atualizar Função no Banco de Dados
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ------------------- MODULE 5: GERAR QR CODE DO SITE ------------------- */}
+      {activeModule === 'qrcode' && (
+        <div className="bg-white p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-2xl mx-auto text-center space-y-6">
+          <div className="flex items-center justify-center gap-3 pb-4 border-b border-gray-200">
+            <QrCode className="w-6 h-6 text-emerald-700" />
+            <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight">
+              QR Code de Acesso ao Site
+            </h3>
+          </div>
+
+          <p className="text-xs text-gray-500 font-medium max-w-md mx-auto">
+            Este QR Code direciona os militares diretamente para a página de login e arranchamento do 7º RC Mec.
+          </p>
+
+          <div className="flex flex-col items-center justify-center p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl max-w-xs mx-auto">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&color=7a0c0c&data=${encodeURIComponent(siteUrl)}`}
+              alt="QR Code do Site ARRANCHA+"
+              className="w-56 h-56 object-contain rounded-2xl shadow-md border border-gray-200 bg-white p-2"
+            />
+            <span className="text-[11px] font-mono text-gray-500 font-bold mt-3 break-all px-2">
+              {siteUrl}
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-3 pt-2">
+            <button
+              onClick={handlePrintQRCode}
+              className="w-full sm:w-auto px-6 py-3 bg-vinho text-white rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-vinho-dark transition-all shadow-md active:scale-95 cursor-pointer"
+            >
+              <Printer className="w-4 h-4 text-ouro" />
+              Imprimir Folha de QR Code
+            </button>
+
+            <button
+              onClick={handleCopyLink}
+              className="w-full sm:w-auto px-6 py-3 bg-gray-100 text-gray-800 border border-gray-300 rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-gray-200 transition-all active:scale-95 cursor-pointer"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-gray-600" />}
+              {copied ? 'Link Copiado!' : 'Copiar Link do Site'}
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

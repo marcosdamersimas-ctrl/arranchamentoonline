@@ -1,0 +1,87 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Raleway", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-vinho: #7A0C0C;
+  --color-vinho-escuro: #4A0505;
+  --color-ouro: #C9A227;
+  --color-grafite: #1E1E1E;
+  --color-cinza: #F3F3F3;
+}
+
+.bg-radial-vignette {
+  background-image: radial-gradient(circle at center, transparent 15%, rgba(29, 0, 4, 0.9) 95%);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 0.8; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 1.2s ease-out forwards;
+}
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(30, 30, 30, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(122, 12, 12, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(122, 12, 12, 0.6);
+}
+
+/* Print Specific Rules for perfect "Vale Diário" voucher printing */
+@media print {
+  html, body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide all elements on the screen by default */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Only make our printable modal and its descendants visible */
+  #print-modal, #print-modal * {
+    visibility: visible;
+  }
+
+  /* Position the print modal to cover the entire page */
+  #print-modal {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    z-index: 9999999 !important;
+  }
+
+  /* Ensure background adjustments work */
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

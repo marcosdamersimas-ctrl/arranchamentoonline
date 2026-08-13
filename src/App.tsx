@@ -18,7 +18,7 @@ import Furriel from './components/Furriel';
 import Admin from './components/Admin';
 import AlterarSenha from './components/AlterarSenha';
 import NoticeBanner from './components/NoticeBanner';
-import arranchaLogo from './assets/arrancha-plus-logo.png';
+import arranchaLogo from './assets/logo-brand-v7.png';
 import { 
   Home, 
   Coffee, 

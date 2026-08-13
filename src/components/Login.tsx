@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FirebaseUser } from '../types';
-import arranchaLogo from '../assets/arrancha-plus-logo.png';
+import arranchaLogo from '../assets/logo-brand-v7.png';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   CalendarCheck, Check, ChevronRight, ClipboardCheck, Copy,
@@ -98,11 +98,11 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               >
                 <div className="absolute inset-0 rounded-[30%] bg-ouro/25 blur-2xl scale-105" />
                 <img
-                  src="/arrancha-plus-logo.png?v=20260813-fix2"
+                  src={arranchaLogo}
                   alt="7º RC Mec - ARRANCHA+"
                   onError={(event) => {
                     event.currentTarget.onerror = null;
-                    event.currentTarget.src = '/arrancha-icon-512.png?v=20260813-fix2';
+                    event.currentTarget.src = '/icon-v7-512.png';
                   }}
                   className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-[28%] object-cover shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-white"
                 />

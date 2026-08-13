@@ -6,18 +6,18 @@
     <title>ARRANCHA+</title>
     
     <!-- PWA Web Manifest -->
-    <link rel="manifest" href="/manifest.webmanifest?v=6" />
+    <link rel="manifest" href="/manifest.json?v=8" />
 
     <!-- Favicons -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/arrancha-icon-32.png?v=6" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/arrancha-icon-16.png?v=6" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-v7-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icon-v7-16.png" />
 
     <!-- Open Graph (iOS Share Sheet / Social Previews) -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="ARRANCHA+" />
     <meta property="og:description" content="Sistema de Arranchamento Inteligente & Controle de Efetivo - 7º RC Mec" />
-    <meta property="og:image" content="/arrancha-icon-512.png?v=6" />
-    <meta property="og:image:secure_url" content="/arrancha-icon-512.png?v=6" />
+    <meta property="og:image" content="/icon-v7-512.png" />
+    <meta property="og:image:secure_url" content="/icon-v7-512.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="512" />
     <meta property="og:image:height" content="512" />
@@ -26,7 +26,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="ARRANCHA+" />
     <meta name="twitter:description" content="Sistema de Arranchamento Inteligente & Controle de Efetivo - 7º RC Mec" />
-    <meta name="twitter:image" content="/arrancha-icon-512.png?v=6" />
+    <meta name="twitter:image" content="/icon-v7-512.png" />
 
     <!-- Android & PWA General Settings -->
     <meta name="theme-color" content="#7A0C0C" />
@@ -39,15 +39,15 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ARRANCHA+" />
-    <link rel="apple-touch-icon" href="/arrancha-icon-180.png?v=6" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/arrancha-icon-180.png?v=6" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/arrancha-icon-152.png?v=6" />
-    <link rel="apple-touch-icon" sizes="144x144" href="/arrancha-icon-144.png?v=6" />
-    <link rel="apple-touch-icon" sizes="128x128" href="/arrancha-icon-128.png?v=6" />
-    <link rel="apple-touch-icon-precomposed" href="/arrancha-icon-180.png?v=6" />
+    <link rel="apple-touch-icon" href="/icon-v7-180.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-v7-180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icon-v7-152.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/icon-v7-144.png" />
+    <link rel="apple-touch-icon" sizes="128x128" href="/icon-v7-128.png" />
+    <link rel="apple-touch-icon-precomposed" href="/icon-v7-180.png" />
 
     <!-- Apple Startup / Splash Image -->
-    <link rel="apple-touch-startup-image" href="/arrancha-icon-512.png?v=6" />
+    <link rel="apple-touch-startup-image" href="/icon-v7-512.png" />
   </head>
   <body>
     <div id="root"></div>
@@ -57,7 +57,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/service-worker.js')
+          navigator.serviceWorker.register('/service-worker.js?v=8', { updateViaCache: 'none' })
             .then(function(registration) {
               console.log('[PWA] ServiceWorker registration successful with scope: ', registration.scope);
             })

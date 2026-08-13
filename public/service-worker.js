@@ -1,17 +1,17 @@
-const CACHE_NAME = 'arrancha-pwa-v6';
+const CACHE_NAME = 'arrancha-pwa-v8-logo-definitivo';
 
 // Static assets to pre-cache
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.webmanifest?v=6',
-  '/arrancha-icon-16.png?v=6',
-  '/arrancha-icon-32.png?v=6',
-  '/arrancha-icon-180.png?v=6',
-  '/arrancha-icon-192.png?v=6',
-  '/arrancha-icon-512.png?v=6',
-  '/arrancha-maskable-512.png?v=6',
-  '/arrancha-plus-logo.png?v=6'
+  '/manifest.json?v=8',
+  '/icon-v7-16.png',
+  '/icon-v7-32.png',
+  '/icon-v7-180.png',
+  '/icon-v7-192.png',
+  '/icon-v7-512.png',
+  '/icon-v7-maskable-512.png',
+  '/logo-brand-v7.png'
 ];
 
 // Helper to determine if a request should NOT be cached

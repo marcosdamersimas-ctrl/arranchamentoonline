@@ -4,6 +4,8 @@ import path from "path";
 import fs from "fs";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, get, set, runTransaction } from "firebase/database";
+import { initializeApp as initAdminApp, cert, applicationDefault, getApps, Credential } from "firebase-admin/app";
+import { getDatabase as getAdminDatabase, Database as AdminDatabase } from "firebase-admin/database";
 
 // A Vercel costuma executar em UTC. As regras de prazo do quartel seguem o
 // horário oficial de Brasília, independentemente do fuso do servidor.
@@ -21,6 +23,66 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const dbRTDB = getDatabase(firebaseApp);
+
+let firebaseAdminReady = false;
+let adminDb: AdminDatabase | null = null;
+
+function initFirebaseAdmin() {
+  try {
+    const databaseURL = firebaseConfig.databaseURL;
+    let credential: Credential | undefined;
+
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+      try {
+        const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON.trim();
+        const serviceAccount = JSON.parse(raw);
+        credential = cert(serviceAccount);
+      } catch (e) {
+        console.warn("FIREBASE_SERVICE_ACCOUNT_JSON inválido, tentando ADC...", e);
+      }
+    }
+
+    if (!credential) {
+      try {
+        credential = applicationDefault();
+      } catch (_e) {
+        // No ADC available
+      }
+    }
+
+    const apps = getApps();
+    if (apps.length === 0) {
+      initAdminApp({
+        credential,
+        databaseURL
+      });
+    }
+
+    adminDb = getAdminDatabase();
+  } catch (err) {
+    console.warn("Firebase Admin SDK não inicializado (usando fallback JS Client SDK/REST):", err);
+  }
+}
+
+initFirebaseAdmin();
+
+async function checkAdminReady(): Promise<boolean> {
+  if (!adminDb) {
+    firebaseAdminReady = false;
+    return false;
+  }
+  try {
+    const testPromise = adminDb.ref("users").limitToFirst(1).once("value");
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1500));
+    await Promise.race([testPromise, timeoutPromise]);
+    firebaseAdminReady = true;
+    console.log("Firebase Admin SDK verificado com sucesso!");
+    return true;
+  } catch (_err) {
+    firebaseAdminReady = false;
+    return false;
+  }
+}
 
 function cleanTextId(text = ""): string {
   return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -98,7 +160,7 @@ function sanitizeUser(user: any): any {
 }
 
 // Validação autoritativa: mudar o relógio do celular não contorna o prazo.
-function isDateLocked(targetDateStr: string, currentTime = new Date()): boolean {
+export function isDateLocked(targetDateStr: string, currentTime = new Date()): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) return true;
   const [year, month, day] = targetDateStr.split("-").map(Number);
   const targetDate = new Date(year, month - 1, day);
@@ -107,17 +169,27 @@ function isDateLocked(targetDateStr: string, currentTime = new Date()): boolean 
   today.setHours(0, 0, 0, 0);
   if (targetDate.getTime() <= today.getTime()) return true;
 
-  const targetDay = targetDate.getDay();
-  if ([6, 0, 1].includes(targetDay)) {
+  const targetDayOfWeek = targetDate.getDay(); // 0 = Dom, 1 = Seg, 2 = Ter, 3 = Qua, 4 = Qui, 5 = Sex, 6 = Sáb
+
+  // Sábado (6), Domingo (0) ou Segunda-feira (1): prazo é Sexta-feira às 10:30h
+  if (targetDayOfWeek === 6 || targetDayOfWeek === 0 || targetDayOfWeek === 1) {
+    const deadlineFriday = new Date(targetDate);
+    if (targetDayOfWeek === 6) deadlineFriday.setDate(deadlineFriday.getDate() - 1);
+    else if (targetDayOfWeek === 0) deadlineFriday.setDate(deadlineFriday.getDate() - 2);
+    else if (targetDayOfWeek === 1) deadlineFriday.setDate(deadlineFriday.getDate() - 3);
+    deadlineFriday.setHours(10, 30, 0, 0);
+    return currentTime.getTime() >= deadlineFriday.getTime();
+  }
+
+  // Terça (2), Quarta (3), Quinta (4) e Sexta (5): prazo é o dia anterior às 15:30h
+  if (targetDayOfWeek >= 2 && targetDayOfWeek <= 5) {
     const deadline = new Date(targetDate);
-    deadline.setDate(deadline.getDate() - (targetDay === 6 ? 1 : targetDay === 0 ? 2 : 3));
-    deadline.setHours(10, 30, 0, 0);
+    deadline.setDate(deadline.getDate() - 1);
+    deadline.setHours(15, 30, 0, 0);
     return currentTime.getTime() >= deadline.getTime();
   }
-  const deadline = new Date(targetDate);
-  deadline.setDate(deadline.getDate() - 1);
-  deadline.setHours(15, 30, 0, 0);
-  return currentTime.getTime() >= deadline.getTime();
+
+  return false;
 }
 
 async function startServer() {
@@ -157,43 +229,80 @@ async function startServer() {
     }
   };
 
-  const persistUsers = async (users: any[], deletedUsers = readDB().deletedUsers) => {
-    const cleanUsers = deduplicateUsers(users);
-    await Promise.all([
-      set(ref(dbRTDB, "users"), cleanUsers),
-      set(ref(dbRTDB, "deletedUsers"), deletedUsers)
-    ]);
-    writeDB({ ...readDB(), users: cleanUsers, deletedUsers });
-    return cleanUsers;
-  };
+  let lastUsersFetchTime = 0;
+  let inFlightUsersPromise: Promise<any[]> | null = null;
 
-  const patchUser = async (identity: string, updater: (user: any) => any) => {
-    const target = findUser(readDB().users, identity);
-    if (!target) return undefined;
-    const stableKey = cleanTextId(target.id || target.login || target.nuc);
-    let savedUser: any;
-    await runTransaction(ref(dbRTDB, "users"), currentValue => {
-      const currentUsers = deduplicateUsers(valuesAsArray(currentValue));
-      const updatedUsers = currentUsers.map(user => {
-        if (!isSameUser(user, target)) return user;
-        savedUser = updater(user);
-        return savedUser;
-      });
-      return updatedUsers;
-    });
-    if (!savedUser) return undefined;
-    const localUsers = readDB().users.map(user => cleanTextId(user.id || user.login || user.nuc) === stableKey ? savedUser : user);
-    writeDB({ ...readDB(), users: deduplicateUsers(localUsers) });
-    return savedUser;
+  const refreshUsersFromFirebase = async (): Promise<any[]> => {
+    const now = Date.now();
+    if (now - lastUsersFetchTime < 2000 && readDB().users.length > 0) {
+      return readDB().users;
+    }
+    if (inFlightUsersPromise) {
+      return inFlightUsersPromise;
+    }
+
+    inFlightUsersPromise = (async () => {
+      try {
+        let remoteUsers: any[] = [];
+        let remoteDeleted: any[] = [];
+
+        if (firebaseAdminReady && adminDb) {
+          const [usersSnap, deletedSnap] = await Promise.all([
+            adminDb.ref("users").once("value"),
+            adminDb.ref("deletedUsers").once("value")
+          ]);
+          remoteUsers = usersSnap.exists() ? valuesAsArray(usersSnap.val()) : [];
+          remoteDeleted = deletedSnap.exists() ? valuesAsArray(deletedSnap.val()).map(String) : [];
+        } else {
+          const [usersSnapshot, deletedSnapshot] = await Promise.all([
+            get(ref(dbRTDB, "users")),
+            get(ref(dbRTDB, "deletedUsers"))
+          ]);
+          remoteUsers = usersSnapshot.exists() ? valuesAsArray(usersSnapshot.val()) : [];
+          remoteDeleted = deletedSnapshot.exists() ? valuesAsArray(deletedSnapshot.val()).map(String) : [];
+        }
+
+        const deletedUsers = Array.from(new Set([...readDB().deletedUsers, ...remoteDeleted]));
+        const deletedSet = new Set(deletedUsers.map(cleanTextId));
+
+        const sourceUsers = remoteUsers.length > 0 ? remoteUsers : readDB().users;
+        const cleanUsers = deduplicateUsers(sourceUsers).filter(user => {
+          const userId = cleanTextId(user.id);
+          const userLogin = cleanTextId(user.login);
+          return (!userId || !deletedSet.has(userId)) && (!userLogin || !deletedSet.has(userLogin));
+        });
+
+        writeDB({ ...readDB(), users: cleanUsers, deletedUsers });
+        lastUsersFetchTime = Date.now();
+        return cleanUsers;
+      } catch (error) {
+        console.warn("Falha ao atualizar usuários do Firebase:", error);
+        return readDB().users;
+      } finally {
+        inFlightUsersPromise = null;
+      }
+    })();
+
+    return inFlightUsersPromise;
   };
 
   const getCanonicalRecords = async (): Promise<any[]> => {
     try {
-      const byIdSnapshot = await get(ref(dbRTDB, "recordsById"));
-      let records = byIdSnapshot.exists() ? valuesAsArray(byIdSnapshot.val()) : [];
-      if (records.length === 0) {
-        const legacySnapshot = await get(ref(dbRTDB, "records"));
-        records = legacySnapshot.exists() ? valuesAsArray(legacySnapshot.val()) : [];
+      let records: any[] = [];
+      if (firebaseAdminReady && adminDb) {
+        const byIdSnap = await adminDb.ref("recordsById").once("value");
+        records = byIdSnap.exists() ? valuesAsArray(byIdSnap.val()) : [];
+        if (records.length === 0) {
+          const legacySnap = await adminDb.ref("records").once("value");
+          records = legacySnap.exists() ? valuesAsArray(legacySnap.val()) : [];
+        }
+      } else {
+        const byIdSnapshot = await get(ref(dbRTDB, "recordsById"));
+        records = byIdSnapshot.exists() ? valuesAsArray(byIdSnapshot.val()) : [];
+        if (records.length === 0) {
+          const legacySnapshot = await get(ref(dbRTDB, "records"));
+          records = legacySnapshot.exists() ? valuesAsArray(legacySnapshot.val()) : [];
+        }
       }
       records = deduplicateRecords(records);
       writeDB({ ...readDB(), records });
@@ -227,36 +336,30 @@ async function startServer() {
 
   const syncOnStartup = async () => {
     try {
-      const [usersSnapshot, deletedSnapshot, byIdSnapshot, legacySnapshot] = await Promise.all([
-        get(ref(dbRTDB, "users")), get(ref(dbRTDB, "deletedUsers")),
-        get(ref(dbRTDB, "recordsById")), get(ref(dbRTDB, "records"))
-      ]);
-      const remoteUsers = usersSnapshot.exists() ? valuesAsArray(usersSnapshot.val()) : [];
-      const deletedUsers = deletedSnapshot.exists() ? valuesAsArray(deletedSnapshot.val()).map(String) : readDB().deletedUsers;
-      const deletedSet = new Set(deletedUsers.map(cleanTextId));
-      const sourceUsers = remoteUsers.length > 0 ? remoteUsers : readDB().users;
-      const users = deduplicateUsers(sourceUsers).filter(user =>
-        !deletedSet.has(cleanTextId(user.id)) && !deletedSet.has(cleanTextId(user.login))
-      );
-      let records = byIdSnapshot.exists() ? valuesAsArray(byIdSnapshot.val()) : [];
-      if (records.length === 0 && legacySnapshot.exists()) records = valuesAsArray(legacySnapshot.val());
-      if (records.length === 0) records = readDB().records;
-      records = deduplicateRecords(records);
-      writeDB({ users, records, deletedUsers });
-      if (!usersSnapshot.exists() && users.length > 0) await set(ref(dbRTDB, "users"), users);
-      if (!deletedSnapshot.exists() && deletedUsers.length > 0) await set(ref(dbRTDB, "deletedUsers"), deletedUsers);
-      if (!byIdSnapshot.exists() && records.length > 0) {
-        await Promise.all(records.map(record => set(ref(dbRTDB, `recordsById/${record.idRegistro}`), record)));
-      }
-      console.log(`Firebase sincronizado: ${users.length} usuários e ${records.length} registros.`);
+      await checkAdminReady();
+      await refreshUsersFromFirebase();
+      const records = await getCanonicalRecords();
+      console.log(`Firebase sincronizado: ${readDB().users.length} usuários e ${records.length} registros.`);
     } catch (error) { console.warn("Inicialização sem Firebase; usando cópia local.", error); }
   };
 
   await syncOnStartup();
 
+  // Health endpoint sem credenciais expostas
+  app.get("/api/health", (_req, res) => {
+    return res.json({
+      ok: true,
+      firebaseConnected: Boolean(readDB().users.length > 0 || readDB().records.length > 0),
+      firebaseAdminReady: Boolean(firebaseAdminReady),
+      usersLoaded: readDB().users.length,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   app.get("/api/server-time", (_req, res) => res.json({ now: new Date().toISOString() }));
 
   app.post("/api/login", async (req, res) => {
+    await refreshUsersFromFirebase();
     const identifier = String(req.body?.usuario || "").trim();
     const password = String(req.body?.senha || "");
     if (!identifier || !password) return res.status(400).json({ error: "Informe usuário e senha." });
@@ -276,12 +379,19 @@ async function startServer() {
         const attempts = Number(identifiable.tentativasIncorretas || 0) + 1;
         const blocked = attempts >= 3;
         try {
-          await patchUser(identifiable.id, item => ({
-            ...item,
-            tentativasIncorretas: Number(item.tentativasIncorretas || 0) + 1,
-            bloqueado: blocked,
-            dataBloqueio: blocked ? new Date().toISOString() : item.dataBloqueio
-          }));
+          await runTransaction(ref(dbRTDB, "users"), (currentVal) => {
+            const currentUsers = deduplicateUsers(valuesAsArray(currentVal));
+            return currentUsers.map(item => {
+              if (!isSameUser(item, identifiable)) return item;
+              return {
+                ...item,
+                tentativasIncorretas: attempts,
+                bloqueado: blocked,
+                dataBloqueio: blocked ? new Date().toISOString() : item.dataBloqueio
+              };
+            });
+          });
+          await refreshUsersFromFirebase();
         } catch (error) { console.error("Falha ao registrar tentativa:", error); }
         if (blocked) return res.status(423).json({ error: "Conta bloqueada após 3 tentativas. Procure o Administrador." });
       }
@@ -291,13 +401,22 @@ async function startServer() {
     let loggedUser = user;
     if (user.tentativasIncorretas) {
       try {
-        loggedUser = await patchUser(user.id, item => ({ ...item, tentativasIncorretas: 0, bloqueado: false })) || user;
+        await runTransaction(ref(dbRTDB, "users"), (currentVal) => {
+          const currentUsers = deduplicateUsers(valuesAsArray(currentVal));
+          return currentUsers.map(item => {
+            if (!isSameUser(item, user)) return item;
+            return { ...item, tentativasIncorretas: 0, bloqueado: false };
+          });
+        });
+        await refreshUsersFromFirebase();
+        loggedUser = findUser(readDB().users, user.id) || user;
       } catch (error) { console.error("Falha ao zerar tentativas:", error); }
     }
     return res.json(loggedUser);
   });
 
-  app.get("/api/users", (req, res) => {
+  app.get("/api/users", async (req, res) => {
+    await refreshUsersFromFirebase();
     const requester = requireUser(req, res);
     if (!requester) return;
     if (requester.nivel === "Administrador") return res.json(readDB().users);
@@ -310,20 +429,41 @@ async function startServer() {
   });
 
   app.post("/api/users", async (req, res) => {
+    await refreshUsersFromFirebase();
     if (!requireAdmin(req, res)) return;
     const newUser = req.body;
     if (!newUser || Array.isArray(newUser) || !newUser.id || !newUser.usuario) return res.status(400).json({ error: "Cadastro inválido." });
     if (!newUser.login || !newUser.senha || !["Militar", "Furriel", "Administrador"].includes(newUser.nivel)) {
       return res.status(400).json({ error: "Informe login, senha e nível de acesso válidos." });
     }
-    if (findUser(readDB().users, newUser.id) || (newUser.login && findUser(readDB().users, newUser.login))) {
-      return res.status(409).json({ error: "Já existe usuário com esse ID ou login." });
-    }
-    const deleted = readDB().deletedUsers.filter(id =>
-      ![newUser.id, newUser.login, newUser.usuario].map(cleanTextId).includes(cleanTextId(id)));
+
+    let txError: string | null = null;
+
     try {
-      const users = await persistUsers([...readDB().users, newUser], deleted);
-      return res.status(201).json(findUser(users, newUser.id));
+      const txResult = await runTransaction(ref(dbRTDB, "users"), (currentVal) => {
+        const currentUsers = deduplicateUsers(valuesAsArray(currentVal));
+        const deletedSet = new Set(readDB().deletedUsers.map(cleanTextId));
+
+        if (deletedSet.has(cleanTextId(newUser.id)) || deletedSet.has(cleanTextId(newUser.login))) {
+          txError = "Este usuário consta como excluído.";
+          return;
+        }
+
+        if (currentUsers.some(u => isSameUser(u, newUser))) {
+          txError = "Já existe usuário com esse ID ou login.";
+          return;
+        }
+
+        return [...currentUsers, newUser];
+      });
+
+      if (txError || !txResult.committed) {
+        return res.status(409).json({ error: txError || "Já existe usuário com esse ID ou login." });
+      }
+
+      const confirmedUsers = deduplicateUsers(valuesAsArray(txResult.snapshot.val()));
+      writeDB({ ...readDB(), users: confirmedUsers });
+      return res.status(201).json(findUser(confirmedUsers, newUser.id));
     } catch (error) {
       console.error("Falha ao cadastrar:", error);
       return res.status(503).json({ error: "Não foi possível salvar no Firebase." });
@@ -331,6 +471,7 @@ async function startServer() {
   });
 
   app.patch("/api/users/:id", async (req, res) => {
+    await refreshUsersFromFirebase();
     const requester = requireUser(req, res);
     if (!requester) return;
     const target = findUser(readDB().users, req.params.id);
@@ -349,8 +490,23 @@ async function startServer() {
       return res.status(409).json({ error: "O sistema precisa manter pelo menos um Administrador." });
     }
     try {
-      const savedUser = await patchUser(target.id, user => ({ ...user, ...patch }));
-      return res.json(savedUser);
+      let updatedUser: any = null;
+      const txResult = await runTransaction(ref(dbRTDB, "users"), (currentVal) => {
+        const currentUsers = deduplicateUsers(valuesAsArray(currentVal));
+        return currentUsers.map(user => {
+          if (!isSameUser(user, target)) return user;
+          updatedUser = { ...user, ...patch };
+          return updatedUser;
+        });
+      });
+
+      if (!txResult.committed || !updatedUser) {
+        return res.status(503).json({ error: "Não foi possível salvar no Firebase." });
+      }
+
+      const confirmedUsers = deduplicateUsers(valuesAsArray(txResult.snapshot.val()));
+      writeDB({ ...readDB(), users: confirmedUsers });
+      return res.json(updatedUser);
     } catch (error) {
       console.error("Falha ao atualizar:", error);
       return res.status(503).json({ error: "Não foi possível salvar no Firebase." });
@@ -358,21 +514,43 @@ async function startServer() {
   });
 
   app.delete("/api/users/:id", async (req, res) => {
+    await refreshUsersFromFirebase();
     if (!requireAdmin(req, res)) return;
     const target = findUser(readDB().users, req.params.id);
     if (!target) return res.status(404).json({ error: "Usuário não encontrado." });
     if (target.nivel === "Administrador" && readDB().users.filter(user => user.nivel === "Administrador").length <= 1) {
       return res.status(409).json({ error: "O sistema precisa manter pelo menos um Administrador." });
     }
-    const keys = [target.id, target.login, target.usuario].filter(Boolean).map(cleanTextId);
-    const deletedUsers = Array.from(new Set([...readDB().deletedUsers, ...keys]));
+    // Salva apenas ID e Login específicos do usuário excluído (sem usuario/nome de guerra) para não afetar homônimos
+    const targetKeys = [target.id, target.login].filter(Boolean).map(cleanTextId);
     try {
-      await persistUsers(readDB().users.filter(user => !isSameUser(user, target)), deletedUsers);
+      const txResult = await runTransaction(ref(dbRTDB, "users"), (currentVal) => {
+        const currentUsers = deduplicateUsers(valuesAsArray(currentVal));
+        return currentUsers.filter(user => !isSameUser(user, target));
+      });
+
+      if (!txResult.committed) {
+        return res.status(503).json({ error: "Não foi possível excluir no Firebase." });
+      }
+
+      const confirmedUsers = deduplicateUsers(valuesAsArray(txResult.snapshot.val()));
+      const newDeletedUsers = Array.from(new Set([...readDB().deletedUsers, ...targetKeys]));
+
+      await set(ref(dbRTDB, "deletedUsers"), newDeletedUsers);
+
       const records = await getCanonicalRecords();
-      const prefixes = new Set([cleanTextId(target.id), cleanTextId(target.login)]);
+      const prefixes = new Set(targetKeys);
       const toDelete = records.filter(record => prefixes.has(extractUserPrefixFromIdRegistro(record.idRegistro)));
+
       await Promise.all(toDelete.map(record => set(ref(dbRTDB, `recordsById/${record.idRegistro}`), null)));
-      writeDB({ ...readDB(), records: records.filter(record => !toDelete.some(item => item.idRegistro === record.idRegistro)) });
+
+      writeDB({
+        ...readDB(),
+        users: confirmedUsers,
+        deletedUsers: newDeletedUsers,
+        records: records.filter(record => !toDelete.some(item => item.idRegistro === record.idRegistro))
+      });
+
       return res.json({ success: true, deletedId: target.id });
     } catch (error) {
       console.error("Falha ao excluir:", error);
@@ -381,6 +559,7 @@ async function startServer() {
   });
 
   app.get("/api/records", async (req, res) => {
+    await refreshUsersFromFirebase();
     const requester = requireUser(req, res);
     if (!requester) return;
     const records = await getCanonicalRecords();
@@ -392,6 +571,7 @@ async function startServer() {
   });
 
   app.put("/api/records/:userId/:date", async (req, res) => {
+    await refreshUsersFromFirebase();
     const requester = requireUser(req, res);
     if (!requester) return;
     const target = findUser(readDB().users, req.params.userId);
@@ -422,6 +602,7 @@ async function startServer() {
   app.post("/api/records", (_req, res) => res.status(410).json({ error: "Atualize a página. A gravação agora é individual." }));
 
   app.get("/api/closures/:date", async (req, res) => {
+    await refreshUsersFromFirebase();
     const requester = requireUser(req, res);
     if (!requester) return;
     if (!["Administrador", "Furriel"].includes(requester.nivel)) return res.status(403).json({ error: "Sem permissão." });
@@ -434,6 +615,7 @@ async function startServer() {
   });
 
   app.post("/api/closures/:date", async (req, res) => {
+    await refreshUsersFromFirebase();
     const requester = requireAdmin(req, res);
     if (!requester) return;
     if (!isDateLocked(req.params.date)) return res.status(409).json({ error: "Feche o vale somente depois do prazo." });

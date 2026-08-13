@@ -327,7 +327,7 @@ export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateM
         >
           <div>
             <div className="flex justify-between items-start mb-4">
-              <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 shadow-sm shrink-0">
+              <div className="p-3.5 rounded-2xl bg-oliva/10 border border-oliva/30 text-oliva-escuro shadow-sm shrink-0">
                 <Moon className="w-6 h-6" />
               </div>
               <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200/50">
@@ -426,18 +426,18 @@ export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateM
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.18 }}
             className={`bg-white border rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 shadow-sm ${
-              activeMobileMeal === 'cafe' && currentRecord.cafe ? 'border-ouro bg-amber-50/10' :
-              activeMobileMeal === 'almoco' && currentRecord.almoco ? 'border-ouro bg-emerald-50/5' :
-              activeMobileMeal === 'jantar' && currentRecord.jantar ? 'border-ouro bg-indigo-50/5' :
+              activeMobileMeal === 'cafe' && currentRecord.cafe ? 'border-ouro bg-marfim-escuro' :
+              activeMobileMeal === 'almoco' && currentRecord.almoco ? 'border-ouro bg-oliva/10' :
+              activeMobileMeal === 'jantar' && currentRecord.jantar ? 'border-ouro bg-vinho/10' :
               'border-gray-200'
             } ${locked ? 'opacity-85' : ''}`}
           >
             <div>
               <div className="flex justify-between items-start mb-4">
                 <div className={`p-3.5 rounded-2xl shadow-sm shrink-0 ${
-                  activeMobileMeal === 'cafe' ? 'bg-amber-50 border border-amber-200 text-amber-600' :
-                  activeMobileMeal === 'almoco' ? 'bg-emerald-50 border border-emerald-200 text-emerald-600' :
-                  'bg-indigo-50 border border-indigo-200 text-indigo-600'
+                  activeMobileMeal === 'cafe' ? 'bg-marfim-escuro border border-ouro/40 text-vinho' :
+                  activeMobileMeal === 'almoco' ? 'bg-oliva/10 border border-oliva/30 text-oliva-escuro' :
+                  'bg-vinho/10 border border-vinho/25 text-vinho-escuro'
                 }`}>
                   {activeMobileMeal === 'cafe' && <Coffee className="w-6 h-6" />}
                   {activeMobileMeal === 'almoco' && <Utensils className="w-6 h-6" />}

@@ -545,9 +545,9 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                     <td className="p-3.5 text-gray-600 font-medium">{u.reparticao}</td>
                     <td className="p-3.5 text-gray-500 font-mono">{u.login || '—'}</td>
                     <td className="p-3.5 font-bold text-xs">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] uppercase ${
-                        u.nivel === 'Administrador' ? 'bg-purple-100 text-purple-800' :
-                        u.nivel === 'Furriel' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-800'
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] uppercase font-bold ${
+                        u.nivel === 'Administrador' ? 'bg-vinho/15 text-vinho border border-vinho/20' :
+                        u.nivel === 'Furriel' ? 'bg-ouro/20 text-vinho border border-ouro/40' : 'bg-oliva/10 text-oliva-escuro border border-oliva/20'
                       }`}>
                         {u.nivel}
                       </span>
@@ -737,11 +737,11 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                   type="button"
                   onClick={() => setRoleNivel('Administrador')}
                   className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
-                    roleNivel === 'Administrador' ? 'border-purple-600 bg-purple-600/5 shadow-sm' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    roleNivel === 'Administrador' ? 'border-vinho bg-vinho/5 shadow-sm' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
                   }`}
                 >
-                  <Shield className="w-5 h-5 text-purple-600 mb-1" />
-                  <span className="font-bold block text-sm text-purple-900">Administrador</span>
+                  <Shield className="w-5 h-5 text-vinho mb-1" />
+                  <span className="font-bold block text-sm text-vinho">Administrador</span>
                   <span className="text-[10px] text-gray-500 font-normal">Acesso total ao painel admin e controle de cadastros.</span>
                 </button>
 
@@ -751,7 +751,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
             <div className="pt-4 flex justify-end">
               <button
                 type="submit"
-                className="w-full md:w-auto px-8 py-3 bg-blue-700 text-white rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-blue-800 transition-all shadow-md active:scale-95 cursor-pointer"
+                className="w-full md:w-auto px-8 py-3 bg-vinho hover:bg-vinho-escuro text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer border border-ouro/30"
               >
                 Atualizar Função no Banco de Dados
               </button>

@@ -104,7 +104,7 @@ export const isDateLocked = (targetDateStr: string, suppliedTime?: Date): boolea
 
   // 3. Para terça, quarta, quinta e sexta, o prazo é o dia anterior às 15:30h.
   // O prazo estrito é o dia anterior às 15:30h!
-  if (targetDayOfWeek >= 3 && targetDayOfWeek <= 5) {
+  if (targetDayOfWeek >= 2 && targetDayOfWeek <= 5) {
     const deadline = new Date(targetDate);
     deadline.setDate(deadline.getDate() - 1);
     deadline.setHours(15, 30, 0, 0);

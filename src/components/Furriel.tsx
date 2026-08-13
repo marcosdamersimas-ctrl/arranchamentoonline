@@ -247,38 +247,38 @@ export default function Furriel({ user, users, meals, onRefresh, onCloseDaily }:
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
             {/* Café Total */}
-            <div className="bg-amber-50/50 border-2 border-amber-200/80 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+            <div className="bg-marfim-escuro border-2 border-ouro/40 rounded-2xl p-5 flex items-center justify-between shadow-sm">
               <div className="space-y-1">
-                <span className="text-xs font-black text-amber-800 uppercase tracking-wider block">CAFÉ DA MANHÃ</span>
+                <span className="text-xs font-black text-vinho uppercase tracking-wider block">CAFÉ DA MANHÃ</span>
                 <span className="text-3xl font-display font-black text-vinho font-mono leading-none">{totalCafe}</span>
-                <span className="text-[10px] text-amber-700 font-bold block">militares arranchados</span>
+                <span className="text-[10px] text-grafite-suave font-bold block">militares arranchados</span>
               </div>
-              <div className="p-3.5 bg-amber-500 text-white rounded-2xl shadow-md border border-amber-600">
+              <div className="p-3.5 bg-ouro text-vinho rounded-2xl shadow-md border border-ouro/60">
                 <Coffee className="w-7 h-7" />
               </div>
             </div>
 
             {/* Almoço Total */}
-            <div className="bg-emerald-50/50 border-2 border-emerald-200/80 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+            <div className="bg-oliva/10 border-2 border-oliva/30 rounded-2xl p-5 flex items-center justify-between shadow-sm">
               <div className="space-y-1">
-                <span className="text-xs font-black text-emerald-800 uppercase tracking-wider block">ALMOÇO</span>
+                <span className="text-xs font-black text-oliva-escuro uppercase tracking-wider block">ALMOÇO</span>
                 <span className="text-3xl font-display font-black text-vinho font-mono leading-none">{totalAlmoco}</span>
-                <span className="text-[10px] text-emerald-700 font-bold block">militares arranchados</span>
+                <span className="text-[10px] text-oliva-escuro font-bold block">militares arranchados</span>
               </div>
-              <div className="p-3.5 bg-emerald-600 text-white rounded-2xl shadow-md border border-emerald-700">
+              <div className="p-3.5 bg-oliva text-white rounded-2xl shadow-md border border-oliva-escuro">
                 <Utensils className="w-7 h-7" />
               </div>
             </div>
 
             {/* Jantar Total */}
-            <div className="bg-indigo-50/50 border-2 border-indigo-200/80 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+            <div className="bg-vinho/10 border-2 border-vinho/25 rounded-2xl p-5 flex items-center justify-between shadow-sm">
               <div className="space-y-1">
-                <span className="text-xs font-black text-indigo-800 uppercase tracking-wider block">JANTAR</span>
+                <span className="text-xs font-black text-vinho uppercase tracking-wider block">JANTAR</span>
                 <span className="text-3xl font-display font-black text-vinho font-mono leading-none">{totalJantar}</span>
-                <span className="text-[10px] text-indigo-700 font-bold block">militares arranchados</span>
+                <span className="text-[10px] text-vinho-escuro font-bold block">militares arranchados</span>
               </div>
-              <div className="p-3.5 bg-indigo-600 text-white rounded-2xl shadow-md border border-indigo-700">
-                <Moon className="w-7 h-7" />
+              <div className="p-3.5 bg-vinho text-white rounded-2xl shadow-md border border-vinho-escuro">
+                <Moon className="w-7 h-7 text-ouro" />
               </div>
             </div>
 

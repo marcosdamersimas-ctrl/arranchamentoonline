@@ -18,6 +18,7 @@ import Furriel from './components/Furriel';
 import Admin from './components/Admin';
 import AlterarSenha from './components/AlterarSenha';
 import NoticeBanner from './components/NoticeBanner';
+import arranchaLogo from './assets/arrancha-plus-logo.png';
 import { 
   Home, 
   Coffee, 
@@ -757,37 +758,39 @@ export default function App() {
         return (
           <div className="space-y-6">
             {/* Welcome banner */}
-            <div className="bg-white p-6 rounded-3xl border border-gray-200/60 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="bg-white p-6 rounded-3xl border-2 border-ouro/30 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h2 className="text-2xl font-display font-black text-vinho tracking-tight">
                   Bem-vindo, {formatMilitaryName(currentUser.usuario, currentUser.graduacao)}!
                 </h2>
-                <p className="text-xs text-gray-500 font-semibold mt-1">
+                <p className="text-xs text-grafite-suave font-semibold mt-1">
                   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 px-4 py-2 bg-vinho/5 border border-vinho/10 rounded-2xl">
+              <div className="flex items-center gap-2 px-4 py-2 bg-oliva/10 border border-oliva/30 rounded-2xl shadow-xs">
                 <Award className="w-4 h-4 text-ouro animate-bounce" />
-                <span className="text-xs font-display font-black uppercase text-vinho tracking-wider">{currentUser.nivel}</span>
+                <span className="text-xs font-display font-black uppercase text-oliva-escuro tracking-wider">{currentUser.nivel}</span>
               </div>
             </div>
 
-            {/* Meal Status circle cards from image */}
+            {/* Meal Status circle cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               
               {/* Café Circle Card */}
-              <div className="bg-white p-6 border border-gray-200 rounded-3xl shadow-sm flex flex-col items-center justify-between min-h-[220px]">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">CAFÉ</span>
+              <div className="bg-white p-6 border-2 border-ouro/20 rounded-3xl shadow-sm flex flex-col items-center justify-between min-h-[220px]">
+                <span className="text-[10px] font-extrabold text-grafite/60 uppercase tracking-widest flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-oliva" /> CAFÉ
+                </span>
                 
                 <div className="my-4 flex flex-col items-center">
                   <div className={`w-16 h-16 rounded-full flex items-center justify-center border-4 ${
-                    todayRecord?.cafe ? 'bg-amber-50 border-ouro text-amber-600' : 'bg-gray-50 border-gray-200 text-gray-400'
+                    todayRecord?.cafe ? 'bg-oliva/10 border-ouro text-oliva shadow-sm' : 'bg-marfim-escuro border-gray-300 text-gray-400'
                   }`}>
                     <Coffee className="w-7 h-7" />
                   </div>
-                  <span className={`text-xs font-bold uppercase mt-3 tracking-wider ${
-                    todayRecord?.cafe ? 'text-emerald-600' : 'text-gray-400'
+                  <span className={`text-xs font-black uppercase mt-3 tracking-wider ${
+                    todayRecord?.cafe ? 'text-oliva-escuro' : 'text-gray-400'
                   }`}>
                     {todayRecord?.cafe ? 'Arranchado' : 'Não solicitado'}
                   </span>
@@ -795,11 +798,11 @@ export default function App() {
 
                 <div className="w-full flex justify-center">
                   {todayRecord?.cafe ? (
-                    <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-oliva text-white flex items-center justify-center shadow-xs">
                       <Check className="w-4 h-4" />
                     </div>
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center">
                       <Minus className="w-4 h-4" />
                     </div>
                   )}
@@ -807,17 +810,19 @@ export default function App() {
               </div>
 
               {/* Almoço Circle Card */}
-              <div className="bg-white p-6 border border-gray-200 rounded-3xl shadow-sm flex flex-col items-center justify-between min-h-[220px]">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ALMOÇO</span>
+              <div className="bg-white p-6 border-2 border-ouro/20 rounded-3xl shadow-sm flex flex-col items-center justify-between min-h-[220px]">
+                <span className="text-[10px] font-extrabold text-grafite/60 uppercase tracking-widest flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-oliva" /> ALMOÇO
+                </span>
                 
                 <div className="my-4 flex flex-col items-center">
                   <div className={`w-16 h-16 rounded-full flex items-center justify-center border-4 ${
-                    todayRecord?.almoco ? 'bg-emerald-50 border-ouro text-emerald-600' : 'bg-gray-50 border-gray-200 text-gray-400'
+                    todayRecord?.almoco ? 'bg-oliva/10 border-ouro text-oliva shadow-sm' : 'bg-marfim-escuro border-gray-300 text-gray-400'
                   }`}>
                     <Utensils className="w-7 h-7" />
                   </div>
-                  <span className={`text-xs font-bold uppercase mt-3 tracking-wider ${
-                    todayRecord?.almoco ? 'text-emerald-600' : 'text-gray-400'
+                  <span className={`text-xs font-black uppercase mt-3 tracking-wider ${
+                    todayRecord?.almoco ? 'text-oliva-escuro' : 'text-gray-400'
                   }`}>
                     {todayRecord?.almoco ? 'Arranchado' : 'Não solicitado'}
                   </span>
@@ -825,11 +830,11 @@ export default function App() {
 
                 <div className="w-full flex justify-center">
                   {todayRecord?.almoco ? (
-                    <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-oliva text-white flex items-center justify-center shadow-xs">
                       <Check className="w-4 h-4" />
                     </div>
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center">
                       <Minus className="w-4 h-4" />
                     </div>
                   )}
@@ -837,17 +842,19 @@ export default function App() {
               </div>
 
               {/* Janta Circle Card */}
-              <div className="bg-white p-6 border border-gray-200 rounded-3xl shadow-sm flex flex-col items-center justify-between min-h-[220px]">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">JANTA</span>
+              <div className="bg-white p-6 border-2 border-ouro/20 rounded-3xl shadow-sm flex flex-col items-center justify-between min-h-[220px]">
+                <span className="text-[10px] font-extrabold text-grafite/60 uppercase tracking-widest flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-oliva" /> JANTA
+                </span>
                 
                 <div className="my-4 flex flex-col items-center">
                   <div className={`w-16 h-16 rounded-full flex items-center justify-center border-4 ${
-                    todayRecord?.jantar ? 'bg-indigo-50 border-ouro text-indigo-600' : 'bg-gray-50 border-gray-200 text-gray-400'
+                    todayRecord?.jantar ? 'bg-oliva/10 border-ouro text-oliva shadow-sm' : 'bg-marfim-escuro border-gray-300 text-gray-400'
                   }`}>
                     <Moon className="w-7 h-7" />
                   </div>
-                  <span className={`text-xs font-bold uppercase mt-3 tracking-wider ${
-                    todayRecord?.jantar ? 'text-emerald-600' : 'text-gray-400'
+                  <span className={`text-xs font-black uppercase mt-3 tracking-wider ${
+                    todayRecord?.jantar ? 'text-oliva-escuro' : 'text-gray-400'
                   }`}>
                     {todayRecord?.jantar ? 'Arranchado' : 'Não solicitado'}
                   </span>
@@ -855,11 +862,11 @@ export default function App() {
 
                 <div className="w-full flex justify-center">
                   {todayRecord?.jantar ? (
-                    <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-oliva text-white flex items-center justify-center shadow-xs">
                       <Check className="w-4 h-4" />
                     </div>
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center">
                       <Minus className="w-4 h-4" />
                     </div>
                   )}
@@ -871,7 +878,7 @@ export default function App() {
             {/* Quick Action Button to go to Arranchamento */}
             <button
               onClick={() => setActiveTab('arranchamento')}
-              className="w-full py-4 bg-vinho hover:bg-vinho-escuro text-white rounded-2xl font-display font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-vinho/10 cursor-pointer"
+              className="w-full py-4 bg-vinho hover:bg-vinho-escuro text-white rounded-2xl font-display font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md border border-ouro/30 cursor-pointer"
             >
               <span>REALIZAR ARRANCHAMENTO</span>
               <ChevronRight className="w-4 h-4 text-ouro" />
@@ -984,7 +991,7 @@ export default function App() {
                 
                 {/* Absolute centermost logo placeholder */}
                 <div className="absolute inset-0 m-auto w-10 h-10 bg-[#8B0000] rounded-xl border-2 border-white flex items-center justify-center shadow-md overflow-hidden p-0.5">
-                  <img src="/arrancha-plus-logo.png?v=6" alt="ARRANCHA+" className="w-full h-full object-cover rounded-lg" />
+                  <img src={arranchaLogo} alt="ARRANCHA+" className="w-full h-full object-cover rounded-lg" />
                 </div>
               </div>
 
@@ -1118,12 +1125,12 @@ export default function App() {
     };
 
     const mobileContent = (
-      <div className={`flex flex-col bg-[#F3F3F3] h-full w-full ${isMobileScreen ? 'min-h-screen' : ''} relative overflow-hidden select-none`}>
+      <div className={`flex flex-col bg-marfim h-full w-full ${isMobileScreen ? 'min-h-screen' : ''} relative overflow-hidden select-none`}>
         {/* Phone App Inner Header bar */}
         <div className="bg-vinho text-white px-5 py-4 border-b border-ouro/20 flex items-center justify-between shrink-0 shadow-md">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center border border-ouro shrink-0 p-0.5 shadow-sm overflow-hidden">
-              <img src="/arrancha-plus-logo.png?v=6" alt="ARRANCHA+" className="w-full h-full object-contain rounded-md" />
+              <img src={arranchaLogo} alt="ARRANCHA+" className="w-full h-full object-contain rounded-md" />
             </div>
             <span className="text-base font-display font-black tracking-tight uppercase">
               ARRANCHA<span className="text-ouro">+</span>
@@ -1145,7 +1152,7 @@ export default function App() {
         </div>
 
         {/* App Content scrolling zone */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 bg-[#F3F3F3] relative" id="mobile-scroll-container">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 bg-marfim relative" id="mobile-scroll-container">
           <NoticeBanner />
           <AnimatePresence mode="wait" custom={slideDirection}>
             <motion.div
@@ -1230,12 +1237,12 @@ export default function App() {
 
     if (isMobileSim) {
       return (
-        <div className="min-h-screen bg-[#F3F3F3] text-grafite flex flex-col font-sans selection:bg-vinho/10 select-none">
+        <div className="min-h-screen bg-marfim text-grafite flex flex-col font-sans selection:bg-vinho/10 select-none">
           {/* Header ONLY for simulation toggle */}
           <header className="bg-vinho text-white border-b border-ouro/25 px-6 py-4 flex justify-between items-center z-20 shrink-0 shadow-md">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white border-2 border-ouro flex items-center justify-center p-0.5 shrink-0 overflow-hidden">
-                <img src="/arrancha-plus-logo.png?v=6" alt="ARRANCHA+" className="w-full h-full object-contain rounded-lg" />
+                <img src={arranchaLogo} alt="ARRANCHA+" className="w-full h-full object-contain rounded-lg" />
               </div>
               <div>
                 <span className="text-lg font-display font-black tracking-tight block">
@@ -1304,14 +1311,14 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F3F3F3] text-grafite flex flex-col font-sans selection:bg-vinho/10 select-none print:bg-white print:text-black">
+    <div className="min-h-screen bg-marfim text-grafite flex flex-col font-sans selection:bg-vinho/10 select-none print:bg-white print:text-black">
       
       {/* Dynamic Header (Web Dashboard view) */}
       <header className="bg-vinho text-white border-b border-ouro/25 px-6 py-4 flex justify-between items-center z-20 print:hidden shrink-0 shadow-md">
         <div className="flex items-center gap-3">
           {/* Logo */}
           <div className="w-10 h-10 rounded-xl bg-white border-2 border-ouro flex items-center justify-center p-0.5 shrink-0 overflow-hidden shadow-sm">
-            <img src="/arrancha-plus-logo.png?v=6" alt="ARRANCHA+" className="w-full h-full object-cover rounded-lg" />
+            <img src={arranchaLogo} alt="ARRANCHA+" className="w-full h-full object-cover rounded-lg" />
           </div>
           <div>
             <span className="text-lg font-display font-black tracking-tight block">
@@ -1442,12 +1449,12 @@ export default function App() {
             <div className="bg-vinho text-white px-5 py-3.5 border-b border-ouro/20 flex items-center justify-between shrink-0">
               <span className="text-sm font-display font-black tracking-tight">ARRANCHA+</span>
               <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center border border-ouro shrink-0 p-0.5 overflow-hidden">
-                <img src="/arrancha-plus-logo.png?v=6" alt="ARRANCHA+" className="w-full h-full object-cover rounded-md" />
+                <img src={arranchaLogo} alt="ARRANCHA+" className="w-full h-full object-cover rounded-md" />
               </div>
             </div>
 
             {/* App Content scrolling zone */}
-            <div className="flex-1 overflow-y-auto p-5 pb-20 bg-[#F3F3F3]" id="mobile-scroll-container">
+            <div className="flex-1 overflow-y-auto p-5 pb-20 bg-marfim" id="mobile-scroll-container">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}

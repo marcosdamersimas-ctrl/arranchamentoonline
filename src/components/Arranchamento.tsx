@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FirebaseUser, ArranchamentoRecord } from '../types';
 import { getNextSevenDays, isDateLocked, isMealForUser } from '../utils/storage';
-import { Calendar, AlertCircle, Coffee, Utensils, Moon, CheckCircle2, XCircle, Lock, ChevronLeft, ChevronRight, CopyCheck } from 'lucide-react';
+import { Calendar, AlertCircle, Coffee, Utensils, Moon, CheckCircle2, XCircle, Lock, ChevronLeft, ChevronRight, CopyCheck, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface ArranchamentoProps {
@@ -14,7 +14,6 @@ interface ArranchamentoProps {
 export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateMeals }: ArranchamentoProps) {
   const daysOfWeek = getNextSevenDays();
   const [selectedDate, setSelectedDate] = useState<string>(daysOfWeek[0].dateStr);
-  const [activeMobileMeal, setActiveMobileMeal] = useState<'cafe' | 'almoco' | 'jantar'>('almoco');
 
   const currentIndex = daysOfWeek.findIndex(d => d.dateStr === selectedDate);
   const hasPrev = currentIndex > 0;
@@ -40,16 +39,15 @@ export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateM
     const weekdayFull = weekdaysFull[date.getDay()];
     
     if (dayObj.label === 'Hoje') {
-      return `Hoje (${formattedDate}) - ${weekdayFull}`;
+      return `Hoje (${formattedDate}) • ${weekdayFull}`;
     } else if (dayObj.label === 'Amanhã') {
-      return `Amanhã (${formattedDate}) - ${weekdayFull}`;
+      return `Amanhã (${formattedDate}) • ${weekdayFull}`;
     } else {
       return `${weekdayFull}, ${formattedDate}`;
     }
   };
 
-  const activeDayObj = daysOfWeek.find(d => d.dateStr === selectedDate);
-  const selectedDateLabel = activeDayObj ? activeDayObj.label : 'Selecionado';
+  const activeDayObj = daysOfWeek.find(d => d.dateStr === selectedDate) || daysOfWeek[0];
 
   // Find record for user/date
   const currentRecord = meals.find(m => isMealForUser(m, user, selectedDate)) || {
@@ -62,11 +60,11 @@ export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateM
     jantar: false
   };
 
-  // A trava do arranchamento aplica-se a todos os usuários (inclusive Administradores e Furriéis)
+  // Trava do arranchamento
   const locked = isDateLocked(selectedDate);
 
   const handleMealToggle = (mealKey: 'cafe' | 'almoco' | 'jantar', currentValue: boolean) => {
-    if (locked) return; // Trava real e funcional
+    if (locked) return;
     onUpdateMeal(selectedDate, mealKey, !currentValue);
   };
 
@@ -99,9 +97,11 @@ export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateM
   };
 
   return (
-    <div className="space-y-6 font-sans text-grafite">
+    <div className="space-y-4 md:space-y-6 font-sans text-grafite pb-6 md:pb-10 w-full max-w-full">
       
-      {/* Top Banner & Week Calendar (Desktop Only) */}
+      {/* =========================================================================
+         DESKTOP HEADER & WEEK SELECTOR (Preserved for desktop md+)
+         ========================================================================= */}
       <div className="hidden md:flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5 bg-white p-6 border border-gray-200/60 rounded-3xl shadow-sm">
         <div>
           <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight flex items-center gap-2">
@@ -113,7 +113,7 @@ export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateM
           </p>
         </div>
         
-        {/* Dynamic 7-Day Week Selector with responsive design */}
+        {/* Dynamic 7-Day Week Selector */}
         <div className="grid grid-cols-4 sm:grid-cols-7 bg-gray-100 p-1 rounded-2xl w-full xl:w-auto gap-1">
           {daysOfWeek.map((day) => {
             const isSelected = selectedDate === day.dateStr;
@@ -121,6 +121,7 @@ export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateM
             return (
               <button
                 key={day.dateStr}
+                type="button"
                 onClick={() => setSelectedDate(day.dateStr)}
                 className={`flex flex-col items-center justify-center py-2 px-3 rounded-xl text-xs transition-all relative cursor-pointer ${
                   isSelected
@@ -143,24 +144,79 @@ export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateM
         </div>
       </div>
 
-      {/* Mobile-Only Day Navigation Header (Exactly 1 day of Arranchamento!) */}
-      <div className="block md:hidden bg-white p-4 border border-gray-200/60 rounded-3xl shadow-sm text-center">
-        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Data do Arranchamento</span>
-        <div className="flex items-center justify-between gap-1.5 bg-gray-50 p-1 rounded-2xl border border-gray-200/50">
+      {/* =========================================================================
+         MOBILE REFACTORED DAY SELECTOR & CAROUSEL (Mobile-first responsive solution)
+         ========================================================================= */}
+      <div className="block md:hidden bg-white p-3.5 sm:p-4 border border-ouro/30 rounded-3xl shadow-sm space-y-3">
+        
+        {/* 7-Days Horizontal Ribbon with Smooth Touch Scroll */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5 px-1">
+            <span className="text-[10px] font-display font-black text-vinho uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-ouro" />
+              Selecione o Dia
+            </span>
+            <span className="text-[9px] font-bold text-gray-400">
+              Próximos 7 dias
+            </span>
+          </div>
+
+          <div className="flex gap-1.5 overflow-x-auto pb-1 pt-0.5 overflow-touch scrollbar-none snap-x">
+            {daysOfWeek.map((day) => {
+              const isSelected = selectedDate === day.dateStr;
+              const isDayLocked = isDateLocked(day.dateStr);
+              return (
+                <button
+                  key={day.dateStr}
+                  type="button"
+                  onClick={() => setSelectedDate(day.dateStr)}
+                  className={`flex flex-col items-center justify-center py-2 px-2.5 rounded-2xl text-xs transition-all relative shrink-0 min-w-[54px] snap-start cursor-pointer border ${
+                    isSelected
+                      ? 'bg-vinho text-white border-ouro shadow-md font-bold'
+                      : isDayLocked
+                      ? 'bg-gray-100 text-gray-500 border-gray-200 hover:border-gray-300'
+                      : 'bg-white text-grafite border-gray-200/80 hover:border-ouro/50'
+                  }`}
+                >
+                  <span className={`text-[9px] uppercase leading-tight ${isSelected ? 'text-ouro font-black' : 'text-gray-500'}`}>
+                    {day.label === 'Hoje' ? 'Hoje' : day.label === 'Amanhã' ? 'Amanhã' : day.weekday}
+                  </span>
+                  <span className="font-mono font-black text-xs mt-0.5">
+                    {formatDateLabel(day.dateStr)}
+                  </span>
+                  {isDayLocked && (
+                    <span className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center border text-[7px] ${
+                      isSelected ? 'bg-ouro text-vinho border-white' : 'bg-red-500 text-white border-white'
+                    }`} title="Bloqueado">
+                      <Lock className="w-2 h-2" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Day Stepper & Active Label Banner */}
+        <div className="flex items-center justify-between gap-2 bg-marfim-escuro/60 p-1.5 rounded-2xl border border-ouro/20">
           <button
             type="button"
             disabled={!hasPrev}
             onClick={handlePrevDay}
-            className={`p-2.5 rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer ${
-              hasPrev ? 'text-vinho hover:bg-gray-200/60 active:scale-95 animate-pulse' : 'text-gray-300 cursor-not-allowed'
+            className={`w-11 h-11 rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer ${
+              hasPrev ? 'bg-white text-vinho shadow-xs active:scale-95 border border-gray-200' : 'text-gray-300 cursor-not-allowed opacity-40'
             }`}
+            title="Dia anterior"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 text-center px-1">
             <p className="text-xs font-display font-black text-vinho uppercase tracking-tight truncate">
-              {activeDayObj ? getFullMobileDateLabel(activeDayObj) : ''}
+              {getFullMobileDateLabel(activeDayObj)}
+            </p>
+            <p className="text-[9px] font-semibold text-grafite-suave truncate mt-0.5">
+              {locked ? '🔒 Arranchamento Encerrado' : '✅ Período Aberto para Alterações'}
             </p>
           </div>
 
@@ -168,332 +224,283 @@ export default function Arranchamento({ user, meals, onUpdateMeal, onBulkUpdateM
             type="button"
             disabled={!hasNext}
             onClick={handleNextDay}
-            className={`p-2.5 rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer ${
-              hasNext ? 'text-vinho hover:bg-gray-200/60 active:scale-95 animate-pulse' : 'text-gray-300 cursor-not-allowed'
+            className={`w-11 h-11 rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer ${
+              hasNext ? 'bg-white text-vinho shadow-xs active:scale-95 border border-gray-200' : 'text-gray-300 cursor-not-allowed opacity-40'
             }`}
+            title="Próximo dia"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Updated Aviso! (Normas de rancho replaced exactly as requested) */}
-      <div className="p-4 bg-vinho/[0.03] border-l-4 border-ouro rounded-r-2xl flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-vinho shrink-0 mt-0.5" />
-        <div className="text-xs text-gray-700 space-y-1">
-          <p className="font-bold text-vinho uppercase tracking-wider text-[11px]">Aviso!</p>
-          <p className="font-semibold text-grafite">O arranchamento garante a etapa do militar. Em caso de falta após arranchar-se, o militar deverá justificar junto ao setor de aprovisionamento.</p>
+      {/* Notice Banner */}
+      <div className="p-3.5 sm:p-4 bg-vinho/[0.04] border-l-4 border-ouro rounded-r-2xl flex items-start gap-2.5 sm:gap-3">
+        <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-vinho shrink-0 mt-0.5" />
+        <div className="text-xs text-gray-700 space-y-0.5">
+          <p className="font-bold text-vinho uppercase tracking-wider text-[10px] sm:text-[11px]">Aviso!</p>
+          <p className="font-semibold text-grafite text-[11px] sm:text-xs leading-relaxed">
+            O arranchamento garante a etapa do militar. Em caso de falta após arranchar-se, o militar deverá justificar junto ao setor de aprovisionamento.
+          </p>
         </div>
       </div>
 
       {/* Lock Warning Banner */}
       {locked && (
-        <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2.5 text-xs text-red-800 font-bold uppercase">
-          <Lock className="w-4 h-4 text-red-600 shrink-0" />
-          <span>Arranchamento encerrado para {formatDateLabel(selectedDate)}. Sáb/Dom/Seg: sexta às 10:30. Ter a Sex: dia anterior às 15:30.</span>
+        <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-start sm:items-center gap-2.5 text-xs text-red-800 font-bold uppercase">
+          <Lock className="w-4 h-4 text-red-600 shrink-0 mt-0.5 sm:mt-0" />
+          <span className="text-[11px] leading-snug">
+            Arranchamento encerrado para {formatDateLabel(selectedDate)}. Sáb/Dom/Seg: sexta às 10:30. Ter a Sex: dia anterior às 15:30.
+          </span>
         </div>
       )}
 
+      {/* Quick bulk action button */}
       {!locked && onBulkUpdateMeals && (
         <button
           type="button"
           onClick={handleRepeatForOpenDays}
-          className="w-full bg-white border border-vinho/15 hover:border-vinho/35 text-vinho rounded-2xl px-5 py-3.5 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all"
+          className="w-full bg-white border border-vinho/20 hover:border-vinho text-vinho rounded-2xl px-4 py-3.5 text-xs font-display font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm active:scale-98 transition-all min-h-[48px] cursor-pointer"
         >
           <CopyCheck className="w-4 h-4 text-ouro" />
-          Repetir estas refeições nos dias abertos
+          <span>Repetir refeições nos dias abertos</span>
         </button>
       )}
 
-      {/* Meal Cards Container - Descriptions (Menus) removed as requested */}
-      <div className="hidden md:grid grid-cols-3 gap-5">
+      {/* =========================================================================
+         MEALS CARDS: Fully Responsive Grid (1 col on mobile, 3 cols on desktop)
+         Clean, large touch targets, color-coded, 100% hand-friendly!
+         ========================================================================= */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
         
-        {/* CAFÉ DA MANHÃ */}
+        {/* 1. CAFÉ DA MANHÃ */}
         <motion.div 
-          whileHover={locked ? {} : { y: -3 }}
-          className={`bg-white border rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md ${
-            currentRecord.cafe ? 'border-ouro bg-amber-50/10' : 'border-gray-200'
-          } ${locked ? 'opacity-85' : ''}`}
+          whileHover={locked ? {} : { y: -2 }}
+          className={`bg-white border rounded-3xl p-4 sm:p-6 flex flex-col justify-between transition-all duration-200 shadow-sm ${
+            currentRecord.cafe 
+              ? 'border-ouro/60 bg-gradient-to-b from-amber-50/40 to-white ring-1 ring-ouro/20' 
+              : 'border-gray-200/80 bg-white'
+          } ${locked ? 'opacity-90' : ''}`}
         >
           <div>
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 shadow-sm shrink-0">
-                <Coffee className="w-6 h-6" />
-              </div>
-              <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200/50">
-                {getMealTimeRange('cafe')}
-              </span>
-            </div>
-            
-            <h4 className="text-base font-display font-black text-vinho uppercase tracking-wider">Café da Manhã</h4>
-          </div>
-
-          <div className="mt-8 pt-4 border-t border-gray-100 flex flex-col gap-3">
-            <div className="flex justify-between items-center text-xs font-semibold">
-              <span className="text-gray-400">Status do Rancho:</span>
-              {currentRecord.cafe ? (
-                <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  Arranchado
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200">
-                  <XCircle className="w-3.5 h-3.5 shrink-0" />
-                  Sem Rancho
-                </span>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                disabled={locked}
-                onClick={() => handleMealToggle('cafe', currentRecord.cafe)}
-                className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  locked
-                    ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed'
-                    : currentRecord.cafe
-                    ? 'bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 cursor-pointer'
-                    : 'bg-vinho text-white hover:bg-vinho-escuro shadow-sm cursor-pointer'
-                }`}
-              >
-                {locked && <Lock className="w-3.5 h-3.5" />}
-                <span>{locked ? 'Rancho Bloqueado' : currentRecord.cafe ? 'Desarranchar' : 'Arranchar'}</span>
-              </button>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* ALMOÇO */}
-        <motion.div 
-          whileHover={locked ? {} : { y: -3 }}
-          className={`bg-white border rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md ${
-            currentRecord.almoco ? 'border-ouro bg-amber-50/10' : 'border-gray-200'
-          } ${locked ? 'opacity-85' : ''}`}
-        >
-          <div>
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 shadow-sm shrink-0">
-                <Utensils className="w-6 h-6" />
-              </div>
-              <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200/50">
-                {getMealTimeRange('almoco')}
-              </span>
-            </div>
-            
-            <h4 className="text-base font-display font-black text-vinho uppercase tracking-wider">Almoço</h4>
-          </div>
-
-          <div className="mt-8 pt-4 border-t border-gray-100 flex flex-col gap-3">
-            <div className="flex justify-between items-center text-xs font-semibold">
-              <span className="text-gray-400">Status do Rancho:</span>
-              {currentRecord.almoco ? (
-                <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  Arranchado
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200">
-                  <XCircle className="w-3.5 h-3.5 shrink-0" />
-                  Sem Rancho
-                </span>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                disabled={locked}
-                onClick={() => handleMealToggle('almoco', currentRecord.almoco)}
-                className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  locked
-                    ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed'
-                    : currentRecord.almoco
-                    ? 'bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 cursor-pointer'
-                    : 'bg-vinho text-white hover:bg-vinho-escuro shadow-sm cursor-pointer'
-                }`}
-              >
-                {locked && <Lock className="w-3.5 h-3.5" />}
-                <span>{locked ? 'Rancho Bloqueado' : currentRecord.almoco ? 'Desarranchar' : 'Arranchar'}</span>
-              </button>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* JANTAR */}
-        <motion.div 
-          whileHover={locked ? {} : { y: -3 }}
-          className={`bg-white border rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md ${
-            currentRecord.jantar ? 'border-ouro bg-amber-50/10' : 'border-gray-200'
-          } ${locked ? 'opacity-85' : ''}`}
-        >
-          <div>
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3.5 rounded-2xl bg-oliva/10 border border-oliva/30 text-oliva-escuro shadow-sm shrink-0">
-                <Moon className="w-6 h-6" />
-              </div>
-              <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200/50">
-                {getMealTimeRange('jantar')}
-              </span>
-            </div>
-            
-            <h4 className="text-base font-display font-black text-vinho uppercase tracking-wider">Jantar</h4>
-          </div>
-
-          <div className="mt-8 pt-4 border-t border-gray-100 flex flex-col gap-3">
-            <div className="flex justify-between items-center text-xs font-semibold">
-              <span className="text-gray-400">Status do Rancho:</span>
-              {currentRecord.jantar ? (
-                <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  Arranchado
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200">
-                  <XCircle className="w-3.5 h-3.5 shrink-0" />
-                  Sem Rancho
-                </span>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                disabled={locked}
-                onClick={() => handleMealToggle('jantar', currentRecord.jantar)}
-                className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  locked
-                    ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed'
-                    : currentRecord.jantar
-                    ? 'bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 cursor-pointer'
-                    : 'bg-vinho text-white hover:bg-vinho-escuro shadow-sm cursor-pointer'
-                }`}
-              >
-                {locked && <Lock className="w-3.5 h-3.5" />}
-                <span>{locked ? 'Rancho Bloqueado' : currentRecord.jantar ? 'Desarranchar' : 'Arranchar'}</span>
-              </button>
-            </div>
-          </div>
-        </motion.div>
-
-      </div>
-
-      {/* Mobile Version: Single card with switcher tabs */}
-      <div className="md:hidden space-y-4">
-        {/* Switcher segmented control bar */}
-        <div className="flex bg-gray-100 p-1 rounded-2xl w-full gap-1 border border-gray-200/50 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setActiveMobileMeal('cafe')}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeMobileMeal === 'cafe'
-                ? 'bg-vinho text-white shadow-md'
-                : 'text-gray-500 hover:text-vinho'
-            }`}
-          >
-            <Coffee className="w-4 h-4" />
-            <span>Café</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveMobileMeal('almoco')}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeMobileMeal === 'almoco'
-                ? 'bg-vinho text-white shadow-md'
-                : 'text-gray-500 hover:text-vinho'
-            }`}
-          >
-            <Utensils className="w-4 h-4" />
-            <span>Almoço</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveMobileMeal('jantar')}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeMobileMeal === 'jantar'
-                ? 'bg-vinho text-white shadow-md'
-                : 'text-gray-500 hover:text-vinho'
-            }`}
-          >
-            <Moon className="w-4 h-4" />
-            <span>Jantar</span>
-          </button>
-        </div>
-
-        {/* Selected Meal Card wrapper with sliding/fade animation */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeMobileMeal}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.18 }}
-            className={`bg-white border rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 shadow-sm ${
-              activeMobileMeal === 'cafe' && currentRecord.cafe ? 'border-ouro bg-marfim-escuro' :
-              activeMobileMeal === 'almoco' && currentRecord.almoco ? 'border-ouro bg-oliva/10' :
-              activeMobileMeal === 'jantar' && currentRecord.jantar ? 'border-ouro bg-vinho/10' :
-              'border-gray-200'
-            } ${locked ? 'opacity-85' : ''}`}
-          >
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <div className={`p-3.5 rounded-2xl shadow-sm shrink-0 ${
-                  activeMobileMeal === 'cafe' ? 'bg-marfim-escuro border border-ouro/40 text-vinho' :
-                  activeMobileMeal === 'almoco' ? 'bg-oliva/10 border border-oliva/30 text-oliva-escuro' :
-                  'bg-vinho/10 border border-vinho/25 text-vinho-escuro'
-                }`}>
-                  {activeMobileMeal === 'cafe' && <Coffee className="w-6 h-6" />}
-                  {activeMobileMeal === 'almoco' && <Utensils className="w-6 h-6" />}
-                  {activeMobileMeal === 'jantar' && <Moon className="w-6 h-6" />}
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 shadow-xs flex items-center justify-center shrink-0">
+                  <Coffee className="w-6 h-6" />
                 </div>
-                <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200/50">
-                  {getMealTimeRange(activeMobileMeal)}
+                <div>
+                  <h4 className="text-base font-display font-black text-vinho uppercase tracking-wider leading-tight">
+                    Café da Manhã
+                  </h4>
+                  <span className="text-[10px] font-mono font-bold text-gray-500 flex items-center gap-1 mt-0.5">
+                    <Clock className="w-3 h-3 text-ouro" />
+                    {getMealTimeRange('cafe')}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-3">
+            <div className="flex justify-between items-center text-xs font-semibold">
+              <span className="text-gray-400">Situação:</span>
+              {currentRecord.cafe ? (
+                <span className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shadow-2xs">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  Arranchado
                 </span>
-              </div>
-              
-              <h4 className="text-base font-display font-black text-vinho uppercase tracking-wider">
-                {activeMobileMeal === 'cafe' ? 'Café da Manhã' : activeMobileMeal === 'almoco' ? 'Almoço' : 'Jantar'}
-              </h4>
+              ) : (
+                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
+                  <XCircle className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  Sem Rancho
+                </span>
+              )}
             </div>
 
-            <div className="mt-8 pt-4 border-t border-gray-100 flex flex-col gap-3">
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-gray-400">Status do Rancho:</span>
-                {((activeMobileMeal === 'cafe' && currentRecord.cafe) ||
-                  (activeMobileMeal === 'almoco' && currentRecord.almoco) ||
-                  (activeMobileMeal === 'jantar' && currentRecord.jantar)) ? (
-                  <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    Arranchado
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200">
-                    <XCircle className="w-3.5 h-3.5 shrink-0" />
-                    Sem Rancho
-                  </span>
-                )}
-              </div>
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => handleMealToggle('cafe', currentRecord.cafe)}
+              className={`w-full py-3.5 px-4 rounded-2xl text-xs font-display font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 min-h-[48px] active:scale-98 cursor-pointer ${
+                locked
+                  ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed'
+                  : currentRecord.cafe
+                  ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 shadow-xs'
+                  : 'bg-vinho hover:bg-vinho-escuro text-white border border-ouro/40 shadow-md'
+              }`}
+            >
+              {locked ? (
+                <>
+                  <Lock className="w-4 h-4 text-gray-400" />
+                  <span>Rancho Bloqueado</span>
+                </>
+              ) : currentRecord.cafe ? (
+                <>
+                  <XCircle className="w-4 h-4 text-red-600" />
+                  <span>Desarranchar Café</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-ouro" />
+                  <span>Arranchar Café</span>
+                </>
+              )}
+            </button>
+          </div>
+        </motion.div>
 
-              <div className="flex gap-2">
-                <button
-                  disabled={locked}
-                  onClick={() => handleMealToggle(activeMobileMeal, activeMobileMeal === 'cafe' ? currentRecord.cafe : activeMobileMeal === 'almoco' ? currentRecord.almoco : currentRecord.jantar)}
-                  className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                    locked
-                      ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed'
-                      : ((activeMobileMeal === 'cafe' && currentRecord.cafe) ||
-                         (activeMobileMeal === 'almoco' && currentRecord.almoco) ||
-                         (activeMobileMeal === 'jantar' && currentRecord.jantar))
-                      ? 'bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 cursor-pointer'
-                      : 'bg-vinho text-white hover:bg-vinho-escuro shadow-sm cursor-pointer'
-                  }`}
-                >
-                  {locked && <Lock className="w-3.5 h-3.5" />}
-                  <span>{locked ? 'Rancho Bloqueado' : ((activeMobileMeal === 'cafe' && currentRecord.cafe) ||
-                         (activeMobileMeal === 'almoco' && currentRecord.almoco) ||
-                         (activeMobileMeal === 'jantar' && currentRecord.jantar)) ? 'Desarranchar' : 'Arranchar'}</span>
-                </button>
+        {/* 2. ALMOÇO */}
+        <motion.div 
+          whileHover={locked ? {} : { y: -2 }}
+          className={`bg-white border rounded-3xl p-4 sm:p-6 flex flex-col justify-between transition-all duration-200 shadow-sm ${
+            currentRecord.almoco 
+              ? 'border-emerald-500/50 bg-gradient-to-b from-emerald-50/40 to-white ring-1 ring-emerald-500/20' 
+              : 'border-gray-200/80 bg-white'
+          } ${locked ? 'opacity-90' : ''}`}
+        >
+          <div>
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 shadow-xs flex items-center justify-center shrink-0">
+                  <Utensils className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-base font-display font-black text-vinho uppercase tracking-wider leading-tight">
+                    Almoço
+                  </h4>
+                  <span className="text-[10px] font-mono font-bold text-gray-500 flex items-center gap-1 mt-0.5">
+                    <Clock className="w-3 h-3 text-emerald-600" />
+                    {getMealTimeRange('almoco')}
+                  </span>
+                </div>
               </div>
             </div>
-          </motion.div>
-        </AnimatePresence>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-3">
+            <div className="flex justify-between items-center text-xs font-semibold">
+              <span className="text-gray-400">Situação:</span>
+              {currentRecord.almoco ? (
+                <span className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shadow-2xs">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  Arranchado
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
+                  <XCircle className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  Sem Rancho
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => handleMealToggle('almoco', currentRecord.almoco)}
+              className={`w-full py-3.5 px-4 rounded-2xl text-xs font-display font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 min-h-[48px] active:scale-98 cursor-pointer ${
+                locked
+                  ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed'
+                  : currentRecord.almoco
+                  ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 shadow-xs'
+                  : 'bg-vinho hover:bg-vinho-escuro text-white border border-ouro/40 shadow-md'
+              }`}
+            >
+              {locked ? (
+                <>
+                  <Lock className="w-4 h-4 text-gray-400" />
+                  <span>Rancho Bloqueado</span>
+                </>
+              ) : currentRecord.almoco ? (
+                <>
+                  <XCircle className="w-4 h-4 text-red-600" />
+                  <span>Desarranchar Almoço</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-ouro" />
+                  <span>Arranchar Almoço</span>
+                </>
+              )}
+            </button>
+          </div>
+        </motion.div>
+
+        {/* 3. JANTAR */}
+        <motion.div 
+          whileHover={locked ? {} : { y: -2 }}
+          className={`bg-white border rounded-3xl p-4 sm:p-6 flex flex-col justify-between transition-all duration-200 shadow-sm ${
+            currentRecord.jantar 
+              ? 'border-vinho/50 bg-gradient-to-b from-vinho/5 to-white ring-1 ring-vinho/20' 
+              : 'border-gray-200/80 bg-white'
+          } ${locked ? 'opacity-90' : ''}`}
+        >
+          <div>
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-vinho/10 border border-vinho/20 text-vinho shadow-xs flex items-center justify-center shrink-0">
+                  <Moon className="w-6 h-6 text-ouro" />
+                </div>
+                <div>
+                  <h4 className="text-base font-display font-black text-vinho uppercase tracking-wider leading-tight">
+                    Jantar
+                  </h4>
+                  <span className="text-[10px] font-mono font-bold text-gray-500 flex items-center gap-1 mt-0.5">
+                    <Clock className="w-3 h-3 text-vinho" />
+                    {getMealTimeRange('jantar')}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-3">
+            <div className="flex justify-between items-center text-xs font-semibold">
+              <span className="text-gray-400">Situação:</span>
+              {currentRecord.jantar ? (
+                <span className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shadow-2xs">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  Arranchado
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
+                  <XCircle className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  Sem Rancho
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => handleMealToggle('jantar', currentRecord.jantar)}
+              className={`w-full py-3.5 px-4 rounded-2xl text-xs font-display font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 min-h-[48px] active:scale-98 cursor-pointer ${
+                locked
+                  ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed'
+                  : currentRecord.jantar
+                  ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 shadow-xs'
+                  : 'bg-vinho hover:bg-vinho-escuro text-white border border-ouro/40 shadow-md'
+              }`}
+            >
+              {locked ? (
+                <>
+                  <Lock className="w-4 h-4 text-gray-400" />
+                  <span>Rancho Bloqueado</span>
+                </>
+              ) : currentRecord.jantar ? (
+                <>
+                  <XCircle className="w-4 h-4 text-red-600" />
+                  <span>Desarranchar Jantar</span>
+                </>
+              ) : (
+                <>
+                  <Utensils className="w-4 h-4 text-ouro" />
+                  <span>Arranchar Jantar</span>
+                </>
+              )}
+            </button>
+          </div>
+        </motion.div>
+
       </div>
 
     </div>

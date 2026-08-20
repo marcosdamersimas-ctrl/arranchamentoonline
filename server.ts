@@ -647,13 +647,8 @@ async function startServer() {
   return app;
 }
 
-const appPromise = startServer();
-
-appPromise.catch(error => {
+startServer().catch(error => {
   console.error("Falha ao iniciar o servidor:", error);
   process.exitCode = 1;
 });
 
-const app = await appPromise;
-
-export default app;

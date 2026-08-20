@@ -1,6 +1,0 @@
-{
-  "name": "Arrancha+",
-  "description": "Sistema de Arranchamento e Controle de Força (7º RC Mec)",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

@@ -15,6 +15,7 @@ export interface FirebaseUser {
   bloqueado?: boolean; // Trava de conta bloqueada após 3 erros
   dataBloqueio?: string; // Data e hora do bloqueio
   approved?: boolean; // Decisão do administrador de manter o militar
+  ativo?: boolean; // Status de atividade
 }
 
 export interface ArranchamentoRecord {

@@ -243,10 +243,10 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
     <div className="space-y-6 font-sans text-grafite pb-10">
       
       {/* Module Title Header */}
-      <div className="bg-white p-6 rounded-3xl border border-gray-200/60 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white p-4 sm:p-6 rounded-3xl border border-gray-200/60 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4">
         <div>
-          <h2 className="text-2xl font-display font-black text-vinho tracking-tight flex items-center gap-2">
-            <Shield className="w-6 h-6 text-ouro" />
+          <h2 className="text-xl sm:text-2xl font-display font-black text-vinho tracking-tight flex items-center gap-2">
+            <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-ouro" />
             Painel do Administrador
           </h2>
           <p className="text-xs text-gray-500 font-semibold mt-1">
@@ -257,7 +257,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
         {activeModule !== 'menu' && (
           <button
             onClick={() => setActiveModule('menu')}
-            className="px-5 py-2.5 bg-vinho text-white rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-vinho-dark transition-all shadow-md active:scale-95 cursor-pointer"
+            className="w-full md:w-auto px-5 py-2.5 bg-vinho text-white rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-vinho-dark transition-all shadow-md active:scale-95 cursor-pointer min-h-[44px]"
           >
             <ArrowLeft className="w-4 h-4" />
             Voltar ao Menu Admin
@@ -267,44 +267,44 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
 
       {/* ------------------- MAIN MENU GRID OF 5 BIG BUTTONS ------------------- */}
       {activeModule === 'menu' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-6">
           
           {/* Button 1: Cadastrar Usuário */}
           <button
             onClick={() => setActiveModule('cadastrar')}
-            className="group text-left bg-white p-7 rounded-3xl border-2 border-gray-200/80 hover:border-vinho/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[190px]"
+            className="group text-left bg-white p-5 sm:p-7 rounded-3xl border-2 border-gray-200/80 hover:border-vinho/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[170px] sm:min-h-[190px]"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-vinho/5 rounded-bl-full transition-transform group-hover:scale-110" />
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-vinho text-ouro flex items-center justify-center shadow-md shrink-0 border border-ouro/30">
-                <UserPlus className="w-7 h-7" />
+            <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4 relative z-10">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-vinho text-ouro flex items-center justify-center shadow-md shrink-0 border border-ouro/30">
+                <UserPlus className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase text-ouro tracking-widest block">Ação do Admin</span>
-                <h3 className="text-lg font-display font-black text-vinho leading-tight">Cadastrar Militar</h3>
+                <h3 className="text-base sm:text-lg font-display font-black text-vinho leading-tight">Cadastrar Militar</h3>
               </div>
             </div>
-            <p className="text-xs text-gray-500 font-medium relative z-10">
-              Adicione um novo militar ao sistema com NUC individual, posto/graduação e esquadrão.
+            <p className="text-xs text-gray-500 font-medium relative z-10 leading-relaxed">
+              Adicione um novo militar com NUC individual, posto/graduação e esquadrão.
             </p>
           </button>
 
           {/* Button 2: Excluir Usuário */}
           <button
             onClick={() => setActiveModule('excluir')}
-            className="group text-left bg-white p-7 rounded-3xl border-2 border-gray-200/80 hover:border-red-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[190px]"
+            className="group text-left bg-white p-5 sm:p-7 rounded-3xl border-2 border-gray-200/80 hover:border-red-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[170px] sm:min-h-[190px]"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-bl-full transition-transform group-hover:scale-110" />
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-red-700 text-white flex items-center justify-center shadow-md shrink-0 border border-red-800">
-                <Trash2 className="w-7 h-7" />
+            <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4 relative z-10">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-red-700 text-white flex items-center justify-center shadow-md shrink-0 border border-red-800">
+                <Trash2 className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase text-red-500 tracking-widest block">Remoção</span>
-                <h3 className="text-lg font-display font-black text-red-900 leading-tight">Excluir Militar</h3>
+                <h3 className="text-base sm:text-lg font-display font-black text-red-900 leading-tight">Excluir Militar</h3>
               </div>
             </div>
-            <p className="text-xs text-gray-500 font-medium relative z-10">
+            <p className="text-xs text-gray-500 font-medium relative z-10 leading-relaxed">
               Remova militares da base de dados com confirmação e exclusão permanente.
             </p>
           </button>
@@ -312,19 +312,19 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
           {/* Button 3: Trocar Esquadrão e Graduação */}
           <button
             onClick={() => setActiveModule('classificar')}
-            className="group text-left bg-white p-7 rounded-3xl border-2 border-gray-200/80 hover:border-amber-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[190px]"
+            className="group text-left bg-white p-5 sm:p-7 rounded-3xl border-2 border-gray-200/80 hover:border-amber-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[170px] sm:min-h-[190px]"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full transition-transform group-hover:scale-110" />
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-md shrink-0 border border-amber-700">
-                <Building className="w-7 h-7" />
+            <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4 relative z-10">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-md shrink-0 border border-amber-700">
+                <Building className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase text-amber-600 tracking-widest block">Classificação</span>
-                <h3 className="text-lg font-display font-black text-vinho leading-tight">Trocar Esquadrão / Graduação</h3>
+                <h3 className="text-base sm:text-lg font-display font-black text-vinho leading-tight">Trocar Esquadrão / Graduação</h3>
               </div>
             </div>
-            <p className="text-xs text-gray-500 font-medium relative z-10">
+            <p className="text-xs text-gray-500 font-medium relative z-10 leading-relaxed">
               Altere a subunidade/esquadrão e o posto ou graduação de qualquer militar.
             </p>
           </button>
@@ -332,19 +332,19 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
           {/* Button 4: Definir Função (Usuário / Furriel / Admin) */}
           <button
             onClick={() => setActiveModule('funcao')}
-            className="group text-left bg-white p-7 rounded-3xl border-2 border-gray-200/80 hover:border-blue-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[190px]"
+            className="group text-left bg-white p-5 sm:p-7 rounded-3xl border-2 border-gray-200/80 hover:border-blue-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[170px] sm:min-h-[190px]"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full transition-transform group-hover:scale-110" />
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-blue-700 text-white flex items-center justify-center shadow-md shrink-0 border border-blue-800">
-                <Shield className="w-7 h-7" />
+            <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4 relative z-10">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-blue-700 text-white flex items-center justify-center shadow-md shrink-0 border border-blue-800">
+                <Shield className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase text-blue-600 tracking-widest block">Nível de Acesso</span>
-                <h3 className="text-lg font-display font-black text-vinho leading-tight">Definir Função (Nível)</h3>
+                <h3 className="text-base sm:text-lg font-display font-black text-vinho leading-tight">Definir Função (Nível)</h3>
               </div>
             </div>
-            <p className="text-xs text-gray-500 font-medium relative z-10">
+            <p className="text-xs text-gray-500 font-medium relative z-10 leading-relaxed">
               Defina quem é Usuário, Furriel ou Administrador no sistema de forma permanente.
             </p>
           </button>
@@ -352,19 +352,19 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
           {/* Button 5: Gerar QR Code de Acesso */}
           <button
             onClick={() => setActiveModule('qrcode')}
-            className="group text-left bg-white p-7 rounded-3xl border-2 border-gray-200/80 hover:border-emerald-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[190px]"
+            className="group text-left bg-white p-5 sm:p-7 rounded-3xl border-2 border-gray-200/80 hover:border-emerald-500/40 hover:shadow-xl transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden min-h-[170px] sm:min-h-[190px]"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-full transition-transform group-hover:scale-110" />
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-md shrink-0 border border-emerald-800">
-                <QrCode className="w-7 h-7" />
+            <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4 relative z-10">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-md shrink-0 border border-emerald-800">
+                <QrCode className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest block">Acesso Rápido</span>
-                <h3 className="text-lg font-display font-black text-vinho leading-tight">Gerar QR Code do Site</h3>
+                <h3 className="text-base sm:text-lg font-display font-black text-vinho leading-tight">Gerar QR Code do Site</h3>
               </div>
             </div>
-            <p className="text-xs text-gray-500 font-medium relative z-10">
+            <p className="text-xs text-gray-500 font-medium relative z-10 leading-relaxed">
               Gere e imprima o QR Code de acesso ao site para ser afixado nas subunidades.
             </p>
           </button>
@@ -374,25 +374,25 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
 
       {/* ------------------- MODULE 1: CADASTRAR MILITAR ------------------- */}
       {activeModule === 'cadastrar' && (
-        <div className="bg-white p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-3xl mx-auto space-y-6">
-          <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
-            <UserPlus className="w-6 h-6 text-vinho" />
-            <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight">
+        <div className="bg-white p-5 sm:p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-3xl mx-auto space-y-5 sm:space-y-6">
+          <div className="flex items-center gap-3 pb-3 sm:pb-4 border-b border-gray-200">
+            <UserPlus className="w-5 h-5 sm:w-6 sm:h-6 text-vinho" />
+            <h3 className="text-lg sm:text-xl font-display font-black text-vinho uppercase tracking-tight">
               Cadastrar Novo Militar
             </h3>
           </div>
 
           {addMsg && (
-            <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+            <div className={`p-3.5 sm:p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
               addMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
             }`}>
-              {addMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
+              {addMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />}
               <span>{addMsg.text}</span>
             </div>
           )}
 
           <form onSubmit={handleAddUserSubmit} className="space-y-4 text-xs font-semibold">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
               
               <div>
                 <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Nome de Guerra *</label>
@@ -402,18 +402,18 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                   placeholder="Ex: SILVA"
                   value={newUsuario}
                   onChange={(e) => setNewUsuario(e.target.value.toUpperCase())}
-                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold min-h-[44px]"
                 />
               </div>
 
               <div>
-                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Login de Acesso (Opicional)</label>
+                <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Login de Acesso (Opcional)</label>
                 <input
                   type="text"
                   placeholder="Ex: 3sgtsilva (deixe em branco p/ gerar)"
                   value={newLogin}
                   onChange={(e) => setNewLogin(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50"
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 min-h-[44px]"
                 />
               </div>
 
@@ -424,7 +424,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                   placeholder="Ex: 10000100 (deixe em branco p/ automático)"
                   value={newNuc}
                   onChange={(e) => setNewNuc(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-mono"
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-mono min-h-[44px]"
                 />
               </div>
 
@@ -433,7 +433,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                 <select
                   value={newGraduacao}
                   onChange={(e) => setNewGraduacao(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold min-h-[44px]"
                 >
                   {GRADUACOES.map(g => (
                     <option key={g} value={g}>{g}</option>
@@ -446,7 +446,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                 <select
                   value={newReparticao}
                   onChange={(e) => setNewReparticao(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold min-h-[44px]"
                 >
                   {REPARTICOES.map(r => (
                     <option key={r} value={r}>{r}</option>
@@ -459,7 +459,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                 <select
                   value={newNivel}
                   onChange={(e) => setNewNivel(e.target.value as UserNivel)}
-                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold min-h-[44px]"
                 >
                   <option value="Militar">Usuário (Militar)</option>
                   <option value="Furriel">Furriel</option>
@@ -473,16 +473,16 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                   type="text"
                   value={newSenha}
                   onChange={(e) => setNewSenha(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-mono"
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-mono min-h-[44px]"
                 />
               </div>
 
             </div>
 
-            <div className="pt-4 flex justify-end">
+            <div className="pt-3 sm:pt-4 flex justify-end">
               <button
                 type="submit"
-                className="w-full md:w-auto px-8 py-3 bg-vinho text-white rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-vinho-dark transition-all shadow-md active:scale-95 cursor-pointer"
+                className="w-full md:w-auto px-8 py-3.5 bg-vinho text-white rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-vinho-dark transition-all shadow-md active:scale-95 cursor-pointer min-h-[46px]"
               >
                 Cadastrar Militar na Base de Dados
               </button>
@@ -493,11 +493,11 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
 
       {/* ------------------- MODULE 2: EXCLUIR MILITAR ------------------- */}
       {activeModule === 'excluir' && (
-        <div className="bg-white p-8 rounded-3xl border border-gray-200/80 shadow-sm space-y-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-200">
+        <div className="bg-white p-4 sm:p-8 rounded-3xl border border-gray-200/80 shadow-sm space-y-4 sm:space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 pb-3 sm:pb-4 border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <Trash2 className="w-6 h-6 text-red-700" />
-              <h3 className="text-xl font-display font-black text-red-900 uppercase tracking-tight">
+              <Trash2 className="w-5 h-5 sm:w-6 sm:h-6 text-red-700" />
+              <h3 className="text-lg sm:text-xl font-display font-black text-red-900 uppercase tracking-tight">
                 Excluir Militar da Base de Dados
               </h3>
             </div>
@@ -510,20 +510,66 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                 placeholder="Buscar por nome, NUC, login..."
                 value={deleteSearch}
                 onChange={(e) => setDeleteSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 rounded-2xl border border-gray-300 text-xs focus:outline-none focus:border-red-600 bg-gray-50"
+                className="w-full pl-9 pr-4 py-2.5 rounded-2xl border border-gray-300 text-xs focus:outline-none focus:border-red-600 bg-gray-50 min-h-[44px]"
               />
             </div>
           </div>
 
           {deleteMsg && (
-            <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{deleteMsg.text}</span>
             </div>
           )}
 
-          {/* Table List */}
-          <div className="overflow-x-auto rounded-2xl border border-gray-200">
+          {/* Mobile Cards View (Hidden on desktop md+) */}
+          <div className="block md:hidden space-y-3">
+            {filteredUsersForDelete.map((u) => (
+              <div key={u.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-bold text-vinho">
+                      {formatMilitaryName(u.usuario, u.graduacao)}
+                    </h4>
+                    <p className="text-[10px] text-gray-500 font-semibold">{u.reparticao}</p>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] uppercase font-bold shrink-0 ${
+                    u.nivel === 'Administrador' ? 'bg-vinho/15 text-vinho border border-vinho/20' :
+                    u.nivel === 'Furriel' ? 'bg-ouro/20 text-vinho border border-ouro/40' : 'bg-oliva/10 text-oliva-escuro border border-oliva/20'
+                  }`}>
+                    {u.nivel}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-gray-500 font-mono border-t border-gray-200/60 pt-2">
+                  <span>NUC: {u.nuc || u.id}</span>
+                  <span>Login: {u.login || '—'}</span>
+                </div>
+
+                <div className="pt-1 flex justify-end">
+                  {u.nivel === 'Administrador' && users.filter(item => item.nivel === 'Administrador').length <= 1 ? (
+                    <span className="text-[10px] text-gray-400 font-bold uppercase">Único Admin</span>
+                  ) : (
+                    <button
+                      onClick={() => handleDeleteUser(u)}
+                      className="w-full py-2.5 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-all shadow-sm active:scale-95 cursor-pointer min-h-[40px]"
+                    >
+                      Excluir Militar
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {filteredUsersForDelete.length === 0 && (
+              <div className="p-8 text-center text-gray-400 font-medium bg-gray-50 rounded-2xl">
+                Nenhum militar encontrado com o termo pesquisado.
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View (Hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto rounded-2xl border border-gray-200">
             <table className="w-full text-left text-xs">
               <thead className="bg-gray-100 text-gray-700 font-bold uppercase tracking-wider border-b border-gray-200">
                 <tr>
@@ -582,24 +628,24 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
 
       {/* ------------------- MODULE 3: TROCAR ESQUADRÃO E GRADUAÇÃO ------------------- */}
       {activeModule === 'classificar' && (
-        <div className="bg-white p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-3xl mx-auto space-y-6">
-          <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
-            <Building className="w-6 h-6 text-amber-600" />
-            <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight">
+        <div className="bg-white p-4 sm:p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-3xl mx-auto space-y-4 sm:space-y-6">
+          <div className="flex items-center gap-3 pb-3 sm:pb-4 border-b border-gray-200">
+            <Building className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600" />
+            <h3 className="text-lg sm:text-xl font-display font-black text-vinho uppercase tracking-tight">
               Trocar Esquadrão e Graduação
             </h3>
           </div>
 
           {classMsg && (
-            <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+            <div className={`p-3.5 sm:p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
               classMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
             }`}>
-              {classMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
+              {classMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />}
               <span>{classMsg.text}</span>
             </div>
           )}
 
-          <form onSubmit={handleClassifySubmit} className="space-y-5 text-xs font-semibold">
+          <form onSubmit={handleClassifySubmit} className="space-y-4 sm:space-y-5 text-xs font-semibold">
             <div>
               <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Selecione o Militar *</label>
               <select
@@ -612,7 +658,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                     setClassGraduacao(selected.graduacao || 'Sd');
                   }
                 }}
-                className="w-full p-3.5 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                className="w-full p-3 sm:p-3.5 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold min-h-[44px]"
               >
                 <option value="">-- Selecione o militar --</option>
                 {users.map(u => (
@@ -623,13 +669,13 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
               </select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
               <div>
                 <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Novo Posto / Graduação</label>
                 <select
                   value={classGraduacao}
                   onChange={(e) => setClassGraduacao(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold min-h-[44px]"
                 >
                   {GRADUACOES.map(g => (
                     <option key={g} value={g}>{g}</option>
@@ -642,7 +688,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                 <select
                   value={classReparticao}
                   onChange={(e) => setClassReparticao(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                  className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold min-h-[44px]"
                 >
                   {REPARTICOES.map(r => (
                     <option key={r} value={r}>{r}</option>
@@ -651,10 +697,10 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
               </div>
             </div>
 
-            <div className="pt-4 flex justify-end">
+            <div className="pt-3 sm:pt-4 flex justify-end">
               <button
                 type="submit"
-                className="w-full md:w-auto px-8 py-3 bg-amber-600 text-white rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-amber-700 transition-all shadow-md active:scale-95 cursor-pointer"
+                className="w-full md:w-auto px-8 py-3.5 bg-amber-600 text-white rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-amber-700 transition-all shadow-md active:scale-95 cursor-pointer min-h-[46px]"
               >
                 Salvar Alterações de Classificação
               </button>
@@ -665,24 +711,24 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
 
       {/* ------------------- MODULE 4: DEFINIR FUNÇÃO (NÍVEL DE ACESSO) ------------------- */}
       {activeModule === 'funcao' && (
-        <div className="bg-white p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-3xl mx-auto space-y-6">
-          <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
-            <Shield className="w-6 h-6 text-blue-700" />
-            <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight">
+        <div className="bg-white p-4 sm:p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-3xl mx-auto space-y-4 sm:space-y-6">
+          <div className="flex items-center gap-3 pb-3 sm:pb-4 border-b border-gray-200">
+            <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-blue-700" />
+            <h3 className="text-lg sm:text-xl font-display font-black text-vinho uppercase tracking-tight">
               Definir Nível de Acesso (Usuário / Furriel / Admin)
             </h3>
           </div>
 
           {roleMsg && (
-            <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+            <div className={`p-3.5 sm:p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
               roleMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
             }`}>
-              {roleMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
+              {roleMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />}
               <span>{roleMsg.text}</span>
             </div>
           )}
 
-          <form onSubmit={handleRoleSubmit} className="space-y-5 text-xs font-semibold">
+          <form onSubmit={handleRoleSubmit} className="space-y-4 sm:space-y-5 text-xs font-semibold">
             <div>
               <label className="block text-gray-600 uppercase text-[10px] tracking-wider mb-1 font-bold">Selecione o Militar *</label>
               <select
@@ -694,7 +740,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                     setRoleNivel(selected.nivel);
                   }
                 }}
-                className="w-full p-3.5 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold"
+                className="w-full p-3 sm:p-3.5 rounded-xl border border-gray-300 focus:outline-none focus:border-vinho bg-gray-50 font-bold min-h-[44px]"
               >
                 <option value="">-- Selecione o militar --</option>
                 {users.map(u => (
@@ -712,7 +758,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                 <button
                   type="button"
                   onClick={() => setRoleNivel('Militar')}
-                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                  className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all cursor-pointer min-h-[44px] ${
                     roleNivel === 'Militar' ? 'border-vinho bg-vinho/5 shadow-sm' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
                   }`}
                 >
@@ -724,7 +770,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                 <button
                   type="button"
                   onClick={() => setRoleNivel('Furriel')}
-                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                  className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all cursor-pointer min-h-[44px] ${
                     roleNivel === 'Furriel' ? 'border-amber-500 bg-amber-500/5 shadow-sm' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
                   }`}
                 >
@@ -736,7 +782,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
                 <button
                   type="button"
                   onClick={() => setRoleNivel('Administrador')}
-                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                  className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all cursor-pointer min-h-[44px] ${
                     roleNivel === 'Administrador' ? 'border-vinho bg-vinho/5 shadow-sm' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
                   }`}
                 >
@@ -748,10 +794,10 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
               </div>
             </div>
 
-            <div className="pt-4 flex justify-end">
+            <div className="pt-3 sm:pt-4 flex justify-end">
               <button
                 type="submit"
-                className="w-full md:w-auto px-8 py-3 bg-vinho hover:bg-vinho-escuro text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer border border-ouro/30"
+                className="w-full md:w-auto px-8 py-3.5 bg-vinho hover:bg-vinho-escuro text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer border border-ouro/30 min-h-[46px]"
               >
                 Atualizar Função no Banco de Dados
               </button>
@@ -762,25 +808,25 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
 
       {/* ------------------- MODULE 5: GERAR QR CODE DO SITE ------------------- */}
       {activeModule === 'qrcode' && (
-        <div className="bg-white p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-2xl mx-auto text-center space-y-6">
-          <div className="flex items-center justify-center gap-3 pb-4 border-b border-gray-200">
-            <QrCode className="w-6 h-6 text-emerald-700" />
-            <h3 className="text-xl font-display font-black text-vinho uppercase tracking-tight">
+        <div className="bg-white p-5 sm:p-8 rounded-3xl border border-gray-200/80 shadow-sm max-w-2xl mx-auto text-center space-y-5 sm:space-y-6">
+          <div className="flex items-center justify-center gap-3 pb-3 sm:pb-4 border-b border-gray-200">
+            <QrCode className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-700" />
+            <h3 className="text-lg sm:text-xl font-display font-black text-vinho uppercase tracking-tight">
               QR Code de Acesso ao Site
             </h3>
           </div>
 
-          <p className="text-xs text-gray-500 font-medium max-w-md mx-auto">
+          <p className="text-xs text-gray-500 font-medium max-w-md mx-auto leading-relaxed">
             Este QR Code direciona os militares diretamente para a página de login e arranchamento do 7º RC Mec.
           </p>
 
-          <div className="flex flex-col items-center justify-center p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl max-w-xs mx-auto">
+          <div className="flex flex-col items-center justify-center p-4 sm:p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl max-w-xs mx-auto">
             <img
               src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&color=7a0c0c&data=${encodeURIComponent(siteUrl)}`}
               alt="QR Code do Site ARRANCHA+"
-              className="w-56 h-56 object-contain rounded-2xl shadow-md border border-gray-200 bg-white p-2"
+              className="w-48 h-48 sm:w-56 sm:h-56 object-contain rounded-2xl shadow-md border border-gray-200 bg-white p-2"
             />
-            <span className="text-[11px] font-mono text-gray-500 font-bold mt-3 break-all px-2">
+            <span className="text-[10px] sm:text-[11px] font-mono text-gray-500 font-bold mt-3 break-all px-2">
               {siteUrl}
             </span>
           </div>
@@ -788,7 +834,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
           <div className="flex flex-col sm:flex-row justify-center items-center gap-3 pt-2">
             <button
               onClick={handlePrintQRCode}
-              className="w-full sm:w-auto px-6 py-3 bg-vinho text-white rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-vinho-dark transition-all shadow-md active:scale-95 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-3.5 bg-vinho text-white rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-vinho-dark transition-all shadow-md active:scale-95 cursor-pointer min-h-[44px]"
             >
               <Printer className="w-4 h-4 text-ouro" />
               Imprimir Folha de QR Code
@@ -796,7 +842,7 @@ export default function Admin({ user, users, onUpdateUser, onDeleteUser, onAddUs
 
             <button
               onClick={handleCopyLink}
-              className="w-full sm:w-auto px-6 py-3 bg-gray-100 text-gray-800 border border-gray-300 rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-gray-200 transition-all active:scale-95 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-3.5 bg-gray-100 text-gray-800 border border-gray-300 rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-gray-200 transition-all active:scale-95 cursor-pointer min-h-[44px]"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-gray-600" />}
               {copied ? 'Link Copiado!' : 'Copiar Link do Site'}

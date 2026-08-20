@@ -52,6 +52,35 @@
   background: rgba(122, 12, 12, 0.6);
 }
 
+/* Mobile & PWA Native Touch Optimizations */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
+}
+
+/* Safe Area Inset Utility Classes for iOS Notch and Home Indicator */
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.pl-safe {
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+}
+
+.pr-safe {
+  padding-right: max(0.75rem, env(safe-area-inset-right));
+}
+
+/* Smooth Touch Momentum Scrolling */
+.overflow-touch {
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Print Specific Rules for perfect "Vale Diário" voucher printing */
 @media print {
   html, body {
